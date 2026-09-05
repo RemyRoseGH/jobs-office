@@ -162,6 +162,27 @@ body.field .office-only { display: none !important; }
         <p class="meta" id="jobMeta"></p>
         <p id="jobCustomer"></p>
       </div>
+      <div class="card" id="jobSummary">
+        <h2>Job summary</h2>
+        <p class="hint">For invoicing. Everything on this job, all tasks.</p>
+        <p class="meta" id="summaryHours"></p>
+        <table>
+          <thead><tr><th>Task</th><th>Who</th><th>Hours</th></tr></thead>
+          <tbody id="summaryLabourBody"></tbody>
+        </table>
+        <h2>Materials</h2>
+        <table>
+          <thead><tr><th>Task</th><th>Item</th><th>Qty</th><th class="office-only">Unit cost</th><th class="office-only">Amount</th></tr></thead>
+          <tbody id="summaryMaterialBody"></tbody>
+        </table>
+        <p class="meta office-only" id="summaryMaterialTotal"></p>
+        <h2>Equipment</h2>
+        <table>
+          <thead><tr><th>Task</th><th>Item</th><th>Qty</th><th class="office-only">Unit cost</th><th class="office-only">Amount</th></tr></thead>
+          <tbody id="summaryEquipmentBody"></tbody>
+        </table>
+        <p class="meta office-only" id="summaryEquipmentTotal"></p>
+      </div>
       <div class="card">
         <h2>Tasks</h2>
         <ul id="taskList" class="job-list"></ul>
@@ -584,6 +605,7 @@ const JOBS = (() => {
     const s = state.currentJob.sites;
     $("jobCustomer").textContent = [c?.name, c?.phone, s?.label, s?.address].filter(Boolean).join(" · ") || "—";
     await loadTasks();
+    await loadJobSummary();
     show("jobView");
     setTab("jobs");
   }
@@ -594,6 +616,78 @@ const JOBS = (() => {
       <div class="num">${escapeHtml(t.number)}</div>
       <strong>${escapeHtml(t.title)}</strong>
     </li>`).join("") || `<li>No tasks</li>`;
+  }
+
+  function taskLabel(row) {
+    const t = row.job_tasks;
+    if (!t) return "—";
+    return `${t.number} ${t.title}`;
+  }
+
+  async function costMap(table, idField, ids) {
+    if (!isOffice() || !ids.length) return {};
+    const rows = await rest("GET", table, { query: `?${idField}=in.(${ids.join(",")})&select=*` });
+    return Object.fromEntries(rows.map((r) => [r[idField], r.unit_cost_cents]));
+  }
+
+  async function loadJobSummary() {
+    const jid = state.currentJob.id;
+    const labour = await rest("GET", "labour_entries", {
+      query: `?job_id=eq.${jid}&select=*,employees(name),job_tasks(number,title)&order=work_date.asc,created_at.asc`,
+    });
+    const totalMins = labour.reduce((a, r) => a + (r.minutes || 0), 0);
+    const byPerson = {};
+    $("summaryLabourBody").innerHTML = labour.map((r) => {
+      const who = r.employees?.name || r.who || "";
+      byPerson[who] = (byPerson[who] || 0) + (r.minutes || 0);
+      return `<tr>
+        <td>${escapeHtml(taskLabel(r))}</td>
+        <td>${escapeHtml(who)}</td>
+        <td>${hhmm(r.minutes)}</td>
+      </tr>`;
+    }).join("") || `<tr><td colspan="3">No labour</td></tr>`;
+    const people = Object.entries(byPerson).map(([n, m]) => `${n} ${hhmm(m)}`).join(" · ");
+    $("summaryHours").textContent = labour.length
+      ? `Total hours ${hhmm(totalMins)}${people ? " · " + people : ""}`
+      : "No hours yet";
+
+    const mats = await rest("GET", "material_entries", {
+      query: `?job_id=eq.${jid}&select=*,job_tasks(number,title)&order=created_at.asc`,
+    });
+    const mcosts = await costMap("material_costs", "material_id", mats.map((r) => r.id));
+    let matSum = 0;
+    $("summaryMaterialBody").innerHTML = mats.map((r) => {
+      const unit = mcosts[r.id];
+      const amt = unit == null ? null : unit * r.qty;
+      if (amt != null) matSum += amt;
+      return `<tr>
+        <td>${escapeHtml(taskLabel(r))}</td>
+        <td>${escapeHtml(r.description)}</td>
+        <td>${r.qty}</td>
+        <td class="office-only">${dollars(unit)}</td>
+        <td class="office-only">${dollars(amt)}</td>
+      </tr>`;
+    }).join("") || `<tr><td colspan="5">No materials</td></tr>`;
+    $("summaryMaterialTotal").textContent = mats.length && isOffice() ? `Materials ${dollars(matSum)}` : "";
+
+    const eqs = await rest("GET", "equipment_entries", {
+      query: `?job_id=eq.${jid}&select=*,job_tasks(number,title)&order=created_at.asc`,
+    });
+    const ecosts = await costMap("equipment_costs", "equipment_id", eqs.map((r) => r.id));
+    let eqSum = 0;
+    $("summaryEquipmentBody").innerHTML = eqs.map((r) => {
+      const unit = ecosts[r.id];
+      const amt = unit == null ? null : unit * r.qty;
+      if (amt != null) eqSum += amt;
+      return `<tr>
+        <td>${escapeHtml(taskLabel(r))}</td>
+        <td>${escapeHtml(r.description)}</td>
+        <td>${r.qty}</td>
+        <td class="office-only">${dollars(amt != null ? unit : null)}</td>
+        <td class="office-only">${dollars(amt)}</td>
+      </tr>`;
+    }).join("") || `<tr><td colspan="5">No equipment</td></tr>`;
+    $("summaryEquipmentTotal").textContent = eqs.length && isOffice() ? `Equipment ${dollars(eqSum)}` : "";
   }
 
   async function openTask(id) {
