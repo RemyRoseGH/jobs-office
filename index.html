@@ -54,6 +54,28 @@ main { max-width: 1100px; margin: 24px auto; padding: 0 16px 24px; }
 .jobs-table tbody tr:hover { background: var(--bg); }
 .jobs-table td { font-size: 14px; padding: 10px 8px; }
 .jobs-table .num { color: var(--muted); white-space: nowrap; }
+.jobs-table th.sortable { cursor: pointer; user-select: none; }
+.jobs-table th.sortable.on { color: var(--ink); }
+.chips { display: flex; gap: 6px; flex-wrap: wrap; margin: 0 0 12px; }
+.chips button {
+  background: #fff;
+  color: var(--ink);
+  border: 1px solid var(--line);
+  padding: 6px 12px;
+  font-size: 13px;
+}
+.chips button.on { background: var(--accent); color: #fff; border-color: var(--accent); }
+textarea {
+  display: block;
+  width: 100%;
+  margin: 0 0 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  font: inherit;
+  color: var(--ink);
+  resize: vertical;
+}
 .card {
   background: var(--card);
   border: 1px solid var(--line);
@@ -180,16 +202,24 @@ body.field .office-only { display: none !important; }
         </select>
         <button type="button" id="newJobBtn">New job</button>
       </div>
+      <div class="chips" id="quickFilters">
+        <button type="button" data-quick="" class="on">All</button>
+        <button type="button" data-quick="active">Active</button>
+        <button type="button" data-quick="on_site">On site</button>
+        <button type="button" data-quick="to_invoice">To invoice</button>
+      </div>
       <div id="listError" class="error" hidden></div>
       <div class="jobs-scroll">
         <table class="jobs-table">
           <thead>
             <tr>
-              <th>Number</th>
-              <th>Job</th>
-              <th>Customer</th>
-              <th>Site</th>
-              <th>Status</th>
+              <th class="sortable" data-sort="number">Number</th>
+              <th class="sortable" data-sort="title">Job</th>
+              <th class="sortable" data-sort="customer">Customer</th>
+              <th class="sortable" data-sort="site">Site</th>
+              <th class="sortable" data-sort="status">Status</th>
+              <th class="sortable" data-sort="scheduled">Scheduled</th>
+              <th class="sortable" data-sort="hours">Hours</th>
             </tr>
           </thead>
           <tbody id="jobList"></tbody>
@@ -201,7 +231,6 @@ body.field .office-only { display: none !important; }
       <button type="button" class="link" id="backToList">← Jobs</button>
       <div class="job-head">
         <h1 id="jobTitle"></h1>
-        <p id="jobCustomer"></p>
         <div class="job-actions">
           <label>Status
             <select id="jobStatus">
@@ -214,10 +243,26 @@ body.field .office-only { display: none !important; }
               <option value="invoiced">Invoiced</option>
             </select>
           </label>
+          <label>Scheduled
+            <input id="jobScheduled" type="date" />
+          </label>
           <button type="button" class="ghost" id="duplicateJob">Duplicate job</button>
         </div>
-        <p class="hint">Duplicate copies customer, site, tasks, materials and equipment. Not hours.</p>
+        <div class="row">
+          <label>Customer
+            <select id="jobCustomerSelect"></select>
+          </label>
+          <label>Site
+            <select id="jobSiteSelect"><option value="">No site</option></select>
+          </label>
+        </div>
+        <p class="hint">Duplicate copies customer, site, tasks, materials and equipment. Not hours or notes.</p>
         <p class="error" id="jobError" hidden></p>
+      </div>
+      <div class="card">
+        <h2>Notes</h2>
+        <textarea id="jobNotes" rows="4" placeholder="What happened on site. Stays on this job."></textarea>
+        <button type="button" id="saveNotes">Save notes</button>
       </div>
       <div class="card" id="jobSummary">
         <h2>Job summary</h2>
@@ -346,6 +391,7 @@ body.field .office-only { display: none !important; }
             <label>Address<input id="newSiteAddress" /></label>
             <button type="button" id="addSiteBtn">Save site</button>
           </details>
+          <label>Scheduled<input id="newScheduled" type="date" /></label>
           <label>First task<input id="firstTaskTitle" placeholder="e.g. Switchboard" /></label>
           <label>Status
             <select id="newStatus">
@@ -374,6 +420,27 @@ body.field .office-only { display: none !important; }
         <table>
           <thead><tr><th>Name</th><th>Phone</th><th>Email</th></tr></thead>
           <tbody id="custBody"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="customerView" hidden>
+      <button type="button" class="link" id="backToCustomers">← Customers</button>
+      <div class="card">
+        <h1 id="custTitle"></h1>
+        <p class="meta" id="custMeta"></p>
+        <h2>Jobs</h2>
+        <table class="jobs-table">
+          <thead>
+            <tr>
+              <th>Number</th>
+              <th>Job</th>
+              <th>Status</th>
+              <th>Scheduled</th>
+              <th>Hours</th>
+            </tr>
+          </thead>
+          <tbody id="custJobBody"></tbody>
         </table>
       </div>
     </section>
@@ -461,6 +528,11 @@ const JOBS = (() => {
     materialCat: [],
     equipmentCat: [],
     pendingCustomerName: "",
+    hoursByJob: {},
+    sortKey: "number",
+    sortDir: "desc",
+    quickFilter: "",
+    currentCustomer: null,
   };
 
   const $ = (id) => document.getElementById(id);
@@ -542,7 +614,7 @@ const JOBS = (() => {
     return ({ trade: "Trade", apprentice: "Apprentice", supervisor: "Supervisor" })[s] || s;
   }
 
-  const views = ["loginView", "jobsTab", "jobView", "taskView", "newJobView", "customersTab", "employeesTab", "catalogueTab"];
+  const views = ["loginView", "jobsTab", "jobView", "taskView", "newJobView", "customersTab", "customerView", "employeesTab", "catalogueTab"];
   function show(id) {
     views.forEach((v) => { const el = $(v); if (el) el.hidden = v !== id; });
   }
@@ -589,8 +661,25 @@ const JOBS = (() => {
     document.body.classList.toggle("field", !isOffice());
   }
 
+  async function loadHours() {
+    const rows = await rest("GET", "labour_entries", { query: "?select=job_id,minutes" });
+    const map = {};
+    for (const r of rows) map[r.job_id] = (map[r.job_id] || 0) + (r.minutes || 0);
+    state.hoursByJob = map;
+  }
+
+  function jobHours(id) {
+    return state.hoursByJob[id] || 0;
+  }
+
+  function numberKey(n) {
+    const m = String(n || "").match(/(\d+)/);
+    return m ? Number(m[1]) : 0;
+  }
+
   async function loadJobs() {
     state.jobs = await rest("GET", "jobs", { query: "?select=*,customers(name),sites(label,address)&order=created_at.desc" });
+    await loadHours();
     renderJobs();
   }
 
@@ -598,7 +687,7 @@ const JOBS = (() => {
     state.customers = await rest("GET", "customers", { query: "?select=*&order=name.asc" });
     $("customerOptions").innerHTML = state.customers.map((c) => `<option value="${escapeHtml(c.name)}"></option>`).join("");
     $("custBody").innerHTML = state.customers.map((c) =>
-      `<tr><td>${escapeHtml(c.name)}</td><td>${escapeHtml(c.phone || "")}</td><td>${escapeHtml(c.email || "")}</td></tr>`
+      `<tr data-id="${c.id}"><td>${escapeHtml(c.name)}</td><td>${escapeHtml(c.phone || "")}</td><td>${escapeHtml(c.email || "")}</td></tr>`
     ).join("");
   }
 
@@ -636,17 +725,43 @@ const JOBS = (() => {
     ).join("");
   }
 
+  function sortJobs(items) {
+    const key = state.sortKey;
+    const dir = state.sortDir === "asc" ? 1 : -1;
+    return items.slice().sort((a, b) => {
+      let av, bv;
+      if (key === "number") { av = numberKey(a.number); bv = numberKey(b.number); }
+      else if (key === "hours") { av = jobHours(a.id); bv = jobHours(b.id); }
+      else if (key === "scheduled") { av = a.scheduled_on || ""; bv = b.scheduled_on || ""; }
+      else if (key === "customer") { av = (a.customers?.name || "").toLowerCase(); bv = (b.customers?.name || "").toLowerCase(); }
+      else if (key === "site") { av = (a.sites?.label || "").toLowerCase(); bv = (b.sites?.label || "").toLowerCase(); }
+      else if (key === "status") { av = a.status; bv = b.status; }
+      else { av = (a.title || "").toLowerCase(); bv = (b.title || "").toLowerCase(); }
+      if (av < bv) return -1 * dir;
+      if (av > bv) return 1 * dir;
+      return 0;
+    });
+  }
+
   function renderJobs() {
     const term = $("search").value.trim().toLowerCase();
     const status = $("statusFilter").value;
-    const items = state.jobs.filter((j) => {
+    const quick = state.quickFilter;
+    let items = state.jobs.filter((j) => {
       const blob = [
-        j.number, j.title, j.summary, statusLabel(j.status),
-        j.customers?.name, j.sites?.label, j.sites?.address,
+        j.number, j.title, j.summary, statusLabel(j.status), j.notes,
+        j.customers?.name, j.sites?.label, j.sites?.address, j.scheduled_on,
       ].join(" ").toLowerCase();
       if (term && !blob.includes(term)) return false;
       if (status && j.status !== status) return false;
+      if (quick === "active" && j.status === "invoiced") return false;
+      if (quick === "on_site" && j.status !== "on_site") return false;
+      if (quick === "to_invoice" && j.status !== "to_invoice") return false;
       return true;
+    });
+    items = sortJobs(items);
+    document.querySelectorAll(".jobs-table thead th.sortable").forEach((th) => {
+      th.classList.toggle("on", th.dataset.sort === state.sortKey);
     });
     $("jobList").innerHTML = items.map((j) => `<tr data-id="${j.id}">
       <td class="num">${escapeHtml(j.number)}</td>
@@ -654,7 +769,38 @@ const JOBS = (() => {
       <td>${escapeHtml(j.customers?.name || "")}</td>
       <td>${escapeHtml(j.sites?.label || "")}</td>
       <td>${escapeHtml(statusLabel(j.status))}</td>
-    </tr>`).join("") || `<tr><td colspan="5">No jobs</td></tr>`;
+      <td>${escapeHtml(j.scheduled_on || "")}</td>
+      <td>${hhmm(jobHours(j.id))}</td>
+    </tr>`).join("") || `<tr><td colspan="7">No jobs</td></tr>`;
+  }
+
+  async function fillJobSites(customerId, selected) {
+    if (!customerId) {
+      $("jobSiteSelect").innerHTML = `<option value="">No site</option>`;
+      return;
+    }
+    const sites = await rest("GET", "sites", { query: `?customer_id=eq.${customerId}&select=*&order=label.asc` });
+    $("jobSiteSelect").innerHTML = `<option value="">No site</option>` + sites.map((s) =>
+      `<option value="${s.id}">${escapeHtml(s.label)}</option>`
+    ).join("");
+    $("jobSiteSelect").value = selected || "";
+  }
+
+  async function fillJobPlaces() {
+    await loadCustomers();
+    $("jobCustomerSelect").innerHTML = state.customers.map((c) =>
+      `<option value="${c.id}">${escapeHtml(c.name)}</option>`
+    ).join("");
+    $("jobCustomerSelect").value = state.currentJob.customer_id;
+    await fillJobSites(state.currentJob.customer_id, state.currentJob.site_id);
+  }
+
+  async function patchJob(body) {
+    const rows = await rest("PATCH", "jobs", {
+      query: `?id=eq.${state.currentJob.id}`,
+      body,
+    });
+    if (rows && rows[0]) Object.assign(state.currentJob, rows[0]);
   }
 
   async function openJob(id) {
@@ -663,14 +809,33 @@ const JOBS = (() => {
     if (!state.currentJob) return;
     $("jobTitle").textContent = `${state.currentJob.number} · ${state.currentJob.title}`;
     $("jobStatus").value = state.currentJob.status;
+    $("jobScheduled").value = state.currentJob.scheduled_on || "";
+    $("jobNotes").value = state.currentJob.notes || "";
     $("jobError").hidden = true;
-    const c = state.currentJob.customers;
-    const s = state.currentJob.sites;
-    $("jobCustomer").textContent = [c?.name, c?.phone, s?.label, s?.address].filter(Boolean).join(" · ") || "—";
+    await fillJobPlaces();
     await loadTasks();
     await loadJobSummary();
     show("jobView");
     setTab("jobs");
+  }
+
+  async function openCustomer(id) {
+    if (!state.jobs.length) await loadJobs();
+    const c = state.customers.find((x) => x.id === id);
+    if (!c) return;
+    state.currentCustomer = c;
+    $("custTitle").textContent = c.name;
+    $("custMeta").textContent = [c.phone, c.email].filter(Boolean).join(" · ") || "";
+    const jobs = sortJobs(state.jobs.filter((j) => j.customer_id === id));
+    $("custJobBody").innerHTML = jobs.map((j) => `<tr data-id="${j.id}">
+      <td class="num">${escapeHtml(j.number)}</td>
+      <td>${escapeHtml(j.title)}</td>
+      <td>${escapeHtml(statusLabel(j.status))}</td>
+      <td>${escapeHtml(j.scheduled_on || "")}</td>
+      <td>${hhmm(jobHours(j.id))}</td>
+    </tr>`).join("") || `<tr><td colspan="5">No jobs</td></tr>`;
+    show("customerView");
+    setTab("customers");
   }
 
   async function loadTasks() {
@@ -964,9 +1129,36 @@ const JOBS = (() => {
 
   $("search").addEventListener("input", renderJobs);
   $("statusFilter").addEventListener("change", renderJobs);
+  $("quickFilters").addEventListener("click", (e) => {
+    const btn = e.target.closest("button[data-quick]");
+    if (!btn) return;
+    state.quickFilter = btn.dataset.quick;
+    $("quickFilters").querySelectorAll("button").forEach((b) => b.classList.toggle("on", b === btn));
+    renderJobs();
+  });
+  document.querySelector("#jobsTab .jobs-table thead").addEventListener("click", (e) => {
+    const th = e.target.closest("th.sortable");
+    if (!th) return;
+    const key = th.dataset.sort;
+    if (state.sortKey === key) state.sortDir = state.sortDir === "asc" ? "desc" : "asc";
+    else { state.sortKey = key; state.sortDir = key === "number" || key === "hours" ? "desc" : "asc"; }
+    renderJobs();
+  });
   $("jobList").addEventListener("click", (e) => {
     const row = e.target.closest("tr[data-id]");
     if (row) openJob(row.dataset.id);
+  });
+  $("custBody").addEventListener("click", (e) => {
+    const row = e.target.closest("tr[data-id]");
+    if (row) openCustomer(row.dataset.id);
+  });
+  $("custJobBody").addEventListener("click", (e) => {
+    const row = e.target.closest("tr[data-id]");
+    if (row) openJob(row.dataset.id);
+  });
+  $("backToCustomers").addEventListener("click", async () => {
+    await loadCustomers();
+    show("customersTab");
   });
   $("taskList").addEventListener("click", (e) => {
     const li = e.target.closest("li[data-id]");
@@ -979,14 +1171,64 @@ const JOBS = (() => {
     $("jobError").hidden = true;
     const status = $("jobStatus").value;
     try {
-      const rows = await rest("PATCH", "jobs", {
-        query: `?id=eq.${state.currentJob.id}`,
-        body: { status },
-      });
-      if (rows && rows[0]) state.currentJob.status = rows[0].status;
+      if (status === "to_invoice") {
+        const labour = await rest("GET", "labour_entries", {
+          query: `?job_id=eq.${state.currentJob.id}&select=id&limit=1`,
+        });
+        if (!labour.length) throw new Error("Add labour before To invoice");
+      }
+      await patchJob({ status });
       await loadJobs();
     } catch (err) {
       $("jobStatus").value = state.currentJob.status;
+      $("jobError").textContent = err.message;
+      $("jobError").hidden = false;
+    }
+  });
+
+  $("jobScheduled").addEventListener("change", async () => {
+    $("jobError").hidden = true;
+    try {
+      await patchJob({ scheduled_on: $("jobScheduled").value || null });
+      await loadJobs();
+    } catch (err) {
+      $("jobScheduled").value = state.currentJob.scheduled_on || "";
+      $("jobError").textContent = err.message;
+      $("jobError").hidden = false;
+    }
+  });
+
+  $("jobCustomerSelect").addEventListener("change", async () => {
+    $("jobError").hidden = true;
+    try {
+      const customer_id = $("jobCustomerSelect").value;
+      await fillJobSites(customer_id, null);
+      await patchJob({ customer_id, site_id: null });
+      await loadJobs();
+    } catch (err) {
+      $("jobCustomerSelect").value = state.currentJob.customer_id;
+      $("jobError").textContent = err.message;
+      $("jobError").hidden = false;
+    }
+  });
+
+  $("jobSiteSelect").addEventListener("change", async () => {
+    $("jobError").hidden = true;
+    try {
+      await patchJob({ site_id: $("jobSiteSelect").value || null });
+      await loadJobs();
+    } catch (err) {
+      $("jobSiteSelect").value = state.currentJob.site_id || "";
+      $("jobError").textContent = err.message;
+      $("jobError").hidden = false;
+    }
+  });
+
+  $("saveNotes").addEventListener("click", async () => {
+    $("jobError").hidden = true;
+    try {
+      await patchJob({ notes: $("jobNotes").value.trim() || null });
+    } catch (err) {
       $("jobError").textContent = err.message;
       $("jobError").hidden = false;
     }
@@ -1046,6 +1288,7 @@ const JOBS = (() => {
         model: "tm",
         customer_id: customer.id,
         site_id: $("siteSelect").value || null,
+        scheduled_on: $("newScheduled").value || null,
         number: "",
       }});
       await rest("POST", "job_tasks", { body: {
