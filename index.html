@@ -90,12 +90,35 @@ th, td { text-align: left; padding: 8px 6px; border-bottom: 1px solid var(--line
 .error { color: var(--danger); font-size: 14px; }
 details { margin: 8px 0 16px; }
 summary { cursor: pointer; color: var(--accent); }
+nav { display: flex; gap: 4px; }
+nav button { background: transparent; color: var(--muted); padding: 8px 10px; }
+nav button.on { color: var(--ink); background: var(--bg); }
+.row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+@media (max-width: 720px) { .row { grid-template-columns: 1fr; } }
+.checks { display: flex; flex-wrap: wrap; gap: 8px 16px; margin: 8px 0 12px; }
+.checks label { display: flex; align-items: center; gap: 6px; margin: 0; color: var(--ink); font-size: 14px; }
+.checks input { width: auto; margin: 0; }
+.inline { display: flex; gap: 8px; flex-wrap: wrap; align-items: end; margin-bottom: 12px; }
+.inline input, .inline select { width: auto; min-width: 140px; flex: 1; }
+.stack input { margin-bottom: 8px; }
+.hint { color: var(--muted); font-size: 13px; }
+dialog { border: 0; border-radius: 12px; padding: 0; }
+dialog::backdrop { background: rgba(0,0,0,.35); }
+dialog .card { margin: 0; }
+dialog menu { display: flex; gap: 8px; justify-content: flex-end; padding: 0; }
+body.field .office-only { display: none !important; }
 
 </style>
 </head>
 <body>
   <header class="top">
     <div class="brand" id="brand">Jobs</div>
+    <nav id="nav" hidden>
+      <button type="button" data-tab="jobs" class="on">Jobs</button>
+      <button type="button" data-tab="customers">Customers</button>
+      <button type="button" data-tab="employees">Employees</button>
+      <button type="button" data-tab="catalogue">Catalogue</button>
+    </nav>
     <div class="top-right" id="topRight" hidden>
       <span id="whoAmI"></span>
       <button type="button" id="signOut">Sign out</button>
@@ -113,7 +136,7 @@ summary { cursor: pointer; color: var(--accent); }
       </form>
     </section>
 
-    <section id="appView" hidden>
+    <section id="jobsTab" hidden>
       <div class="toolbar">
         <input id="search" type="search" placeholder="Search jobs" />
         <select id="statusFilter">
@@ -137,33 +160,91 @@ summary { cursor: pointer; color: var(--accent); }
       <div class="job-head">
         <h1 id="jobTitle"></h1>
         <p class="meta" id="jobMeta"></p>
-      </div>
-      <div class="grid">
-        <div class="card">
-          <h2>Customer / site</h2>
-          <p id="jobCustomer"></p>
-        </div>
-        <div class="card">
-          <h2>Add labour</h2>
-          <form id="labourForm">
-            <label>Who<input id="labourWho" required /></label>
-            <label>Date<input id="labourDate" type="date" required /></label>
-            <label>Hours (HH:MM)<input id="labourHours" placeholder="04:30" pattern="^[0-9]{1,3}:[0-5][0-9]$" required /></label>
-            <label>Task<input id="labourTask" /></label>
-            <p class="error" id="labourError" hidden></p>
-            <button type="submit">Add hours</button>
-          </form>
-        </div>
+        <p id="jobCustomer"></p>
       </div>
       <div class="card">
+        <h2>Tasks</h2>
+        <ul id="taskList" class="job-list"></ul>
+        <form id="newTaskForm" class="inline">
+          <input id="newTaskTitle" placeholder="New task name" required />
+          <button type="submit">Add task</button>
+        </form>
+        <p class="error" id="taskError" hidden></p>
+      </div>
+    </section>
+
+    <section id="taskView" hidden>
+      <button type="button" class="link" id="backToJob">← Job</button>
+      <div class="job-head">
+        <h1 id="taskTitle"></h1>
+        <p class="meta" id="taskMeta"></p>
+      </div>
+
+      <div class="card">
         <h2>Labour</h2>
+        <form id="labourForm">
+          <p class="hint">Select one or more people. Same start and finish is written once.</p>
+          <div id="employeeChecks" class="checks"></div>
+          <div class="row">
+            <label>Date<input id="labourDate" type="date" required /></label>
+            <label>Start<select id="labourStart" required></select></label>
+            <label>Finish<select id="labourFinish" required></select></label>
+          </div>
+          <label>Note<input id="labourNote" /></label>
+          <p class="meta" id="labourPreview"></p>
+          <p class="error" id="labourError" hidden></p>
+          <button type="submit">Add labour</button>
+        </form>
         <table>
-          <thead>
-            <tr><th>Who</th><th>Date</th><th>Hours</th><th>Task</th></tr>
-          </thead>
+          <thead><tr><th>Who</th><th>Date</th><th>Start</th><th>Finish</th><th>Hours</th><th>Note</th></tr></thead>
           <tbody id="labourBody"></tbody>
         </table>
         <p class="meta" id="labourTotal"></p>
+      </div>
+
+      <div class="grid">
+        <div class="card">
+          <h2>Materials</h2>
+          <form id="materialForm">
+            <label>From catalogue
+              <select id="materialCat"><option value="">Ad-hoc</option></select>
+            </label>
+            <label>Description<input id="materialDesc" /></label>
+            <div class="row">
+              <label>Qty<input id="materialQty" type="number" min="1" value="1" required /></label>
+              <label class="office-only">Unit cost ($)
+                <input id="materialCost" inputmode="decimal" placeholder="0.00" />
+              </label>
+            </div>
+            <p class="error" id="materialError" hidden></p>
+            <button type="submit">Add material</button>
+          </form>
+          <table>
+            <thead><tr><th>Item</th><th>Qty</th><th class="office-only">Unit</th></tr></thead>
+            <tbody id="materialBody"></tbody>
+          </table>
+        </div>
+        <div class="card">
+          <h2>Equipment</h2>
+          <form id="equipmentForm">
+            <label>From catalogue
+              <select id="equipmentCat"><option value="">Ad-hoc</option></select>
+            </label>
+            <label>Description<input id="equipmentDesc" /></label>
+            <div class="row">
+              <label>Qty<input id="equipmentQty" type="number" min="1" value="1" required /></label>
+              <label class="office-only">Unit cost ($)
+                <input id="equipmentCost" inputmode="decimal" placeholder="0.00" />
+              </label>
+            </div>
+            <p class="error" id="equipmentError" hidden></p>
+            <button type="submit">Add equipment</button>
+          </form>
+          <table>
+            <thead><tr><th>Item</th><th>Qty</th><th class="office-only">Unit</th></tr></thead>
+            <tbody id="equipmentBody"></tbody>
+          </table>
+        </div>
       </div>
     </section>
 
@@ -172,15 +253,22 @@ summary { cursor: pointer; color: var(--accent); }
       <div class="card narrow">
         <h1>New job</h1>
         <form id="newJobForm">
-          <label>Title<input id="newTitle" required /></label>
-          <label>Summary<input id="newSummary" /></label>
-          <label>Model
-            <select id="newModel">
-              <option value="tm">T&amp;M</option>
-              <option value="quoted">Quoted</option>
-              <option value="measured">Measured</option>
-            </select>
+          <label>Project name<input id="newTitle" required /></label>
+          <label>Description<input id="newSummary" /></label>
+          <label>Customer
+            <input id="customerTypeahead" list="customerOptions" autocomplete="off" required />
+            <datalist id="customerOptions"></datalist>
           </label>
+          <label>Site
+            <select id="siteSelect"><option value="">No site</option></select>
+          </label>
+          <details>
+            <summary>New site</summary>
+            <label>Label<input id="newSiteLabel" /></label>
+            <label>Address<input id="newSiteAddress" /></label>
+            <button type="button" id="addSiteBtn">Save site</button>
+          </details>
+          <label>First task<input id="firstTaskTitle" placeholder="e.g. Switchboard" /></label>
           <label>Status
             <select id="newStatus">
               <option value="enquiry">Enquiry</option>
@@ -189,33 +277,95 @@ summary { cursor: pointer; color: var(--accent); }
               <option value="on_site">On site</option>
             </select>
           </label>
-          <label>Scheduled on<input id="newScheduled" type="date" /></label>
-          <label>Customer
-            <select id="customerSelect" required></select>
-          </label>
-          <details>
-            <summary>New customer</summary>
-            <label>Name<input id="newCustomerName" /></label>
-            <label>Phone<input id="newCustomerPhone" /></label>
-            <button type="button" id="addCustomerBtn">Save customer</button>
-          </details>
-          <label>Site
-            <select id="siteSelect">
-              <option value="">No site</option>
-            </select>
-          </label>
-          <details>
-            <summary>New site</summary>
-            <label>Label<input id="newSiteLabel" /></label>
-            <label>Address<input id="newSiteAddress" /></label>
-            <button type="button" id="addSiteBtn">Save site</button>
-          </details>
           <p class="error" id="newJobError" hidden></p>
           <button type="submit">Create job</button>
         </form>
       </div>
     </section>
+
+    <section id="customersTab" hidden>
+      <div class="card">
+        <h1>Customers</h1>
+        <form id="customerForm" class="inline">
+          <input id="custName" placeholder="Name" required />
+          <input id="custPhone" placeholder="Phone" />
+          <input id="custEmail" placeholder="Email" />
+          <button type="submit">Add customer</button>
+        </form>
+        <p class="error" id="custError" hidden></p>
+        <table>
+          <thead><tr><th>Name</th><th>Phone</th><th>Email</th></tr></thead>
+          <tbody id="custBody"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="employeesTab" hidden>
+      <div class="card">
+        <h1>Employees</h1>
+        <form id="employeeForm" class="inline">
+          <input id="empName" placeholder="Name" required />
+          <select id="empClass">
+            <option value="trade">Trade</option>
+            <option value="apprentice">Apprentice</option>
+            <option value="supervisor">Supervisor</option>
+          </select>
+          <button type="submit">Add employee</button>
+        </form>
+        <p class="error" id="empError" hidden></p>
+        <table>
+          <thead><tr><th>Name</th><th>Classification</th></tr></thead>
+          <tbody id="empBody"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="catalogueTab" hidden>
+      <div class="grid">
+        <div class="card">
+          <h1>Materials</h1>
+          <form id="matCatForm" class="stack">
+            <input id="matCatName" placeholder="Name" required />
+            <input id="matCatUnit" placeholder="Unit" value="ea" />
+            <input id="matCatCost" class="office-only" placeholder="Unit cost $" inputmode="decimal" />
+            <button type="submit">Add</button>
+          </form>
+          <p class="error" id="matCatError" hidden></p>
+          <table>
+            <thead><tr><th>Name</th><th>Unit</th><th class="office-only">Cost</th></tr></thead>
+            <tbody id="matCatBody"></tbody>
+          </table>
+        </div>
+        <div class="card">
+          <h1>Equipment</h1>
+          <form id="eqCatForm" class="stack">
+            <input id="eqCatName" placeholder="Name" required />
+            <input id="eqCatUnit" placeholder="Unit" value="day" />
+            <input id="eqCatCost" class="office-only" placeholder="Unit cost $" inputmode="decimal" />
+            <button type="submit">Add</button>
+          </form>
+          <p class="error" id="eqCatError" hidden></p>
+          <table>
+            <thead><tr><th>Name</th><th>Unit</th><th class="office-only">Cost</th></tr></thead>
+            <tbody id="eqCatBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
   </main>
+
+  <dialog id="newCustomerDialog">
+    <form method="dialog" class="card" id="newCustomerDialogForm">
+      <h2>Set up this customer?</h2>
+      <p id="newCustomerPrompt"></p>
+      <label>Phone<input id="dialogPhone" /></label>
+      <menu>
+        <button type="button" id="dialogCancel" value="cancel">Cancel</button>
+        <button type="submit" id="dialogSave" value="ok">Save customer</button>
+      </menu>
+    </form>
+  </dialog>
+
   <script>
 window.CONFIG = { url: "https://ptoexwskxhbtepgsncqq.supabase.co", anonKey: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InB0b2V4d3NreGhidGVwZ3NuY3FxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg2MDQwNDIsImV4cCI6MjEwNDE4MDA0Mn0.HYOondB7Y-8ohsl9Tj2dzMC6syq_9KMcCJu0G5dE8H4" };
 
@@ -227,22 +377,20 @@ const JOBS = (() => {
     jobs: [],
     customers: [],
     sites: [],
+    employees: [],
     currentJob: null,
+    currentTask: null,
+    materialCat: [],
+    equipmentCat: [],
+    pendingCustomerName: "",
   };
 
   const $ = (id) => document.getElementById(id);
+  const isOffice = () => ["owner", "office"].includes(state.profile?.role);
 
-  function headers(extra = {}) {
-    const h = {
-      apikey: CONFIG.anonKey,
-      "Content-Type": "application/json",
-      ...extra,
-    };
-    if (state.session?.access_token) {
-      h.Authorization = `Bearer ${state.session.access_token}`;
-    } else {
-      h.Authorization = `Bearer ${CONFIG.anonKey}`;
-    }
+  function headers() {
+    const h = { apikey: CONFIG.anonKey, "Content-Type": "application/json" };
+    h.Authorization = `Bearer ${state.session?.access_token || CONFIG.anonKey}`;
     return h;
   }
 
@@ -257,59 +405,97 @@ const JOBS = (() => {
     return data;
   }
 
-  async function rest(method, table, { query = "", body, single } = {}) {
+  async function rest(method, table, { query = "", body } = {}) {
     const res = await fetch(`${CONFIG.url}/rest/v1/${table}${query}`, {
       method,
-      headers: {
-        ...headers(),
-        Prefer: single ? "return=representation,resolution=merge-duplicates" : "return=representation",
-        ...(single ? { Accept: "application/vnd.pgrst.object+json" } : {}),
-      },
+      headers: { ...headers(), Prefer: "return=representation" },
       body: body ? JSON.stringify(body) : undefined,
     });
     if (res.status === 204) return null;
     const data = await res.json().catch(() => ({}));
-    if (!res.ok) {
-      const msg = data.message || data.hint || data.error || JSON.stringify(data);
-      throw new Error(msg);
-    }
+    if (!res.ok) throw new Error(data.message || data.hint || data.error || JSON.stringify(data));
     return data;
-  }
-
-  function minutesFromHHMM(value) {
-    const m = String(value).trim().match(/^(\d{1,3}):([0-5]\d)$/);
-    if (!m) throw new Error("Use HH:MM");
-    return Number(m[1]) * 60 + Number(m[2]);
   }
 
   function hhmm(minutes) {
     const n = Number(minutes) || 0;
-    const h = Math.floor(n / 60);
-    const m = n % 60;
-    return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+    return `${String(Math.floor(n / 60)).padStart(2, "0")}:${String(n % 60).padStart(2, "0")}`;
+  }
+
+  function parseClock(value) {
+    const [h, m] = String(value).split(":").map(Number);
+    return h * 60 + m;
+  }
+
+  function duration(start, finish) {
+    if (finish > start) return finish - start;
+    if (finish === start) return 0;
+    return 1440 - start + finish;
+  }
+
+  function dollars(cents) {
+    if (cents == null || cents === "") return "";
+    return (Number(cents) / 100).toFixed(2);
+  }
+
+  function toCents(text) {
+    if (!text) return null;
+    const n = Number(String(text).replace(/[^0-9.]/g, ""));
+    if (Number.isNaN(n)) throw new Error("Cost must be dollars and cents");
+    return Math.round(n * 100);
+  }
+
+  function escapeHtml(s) {
+    return String(s ?? "")
+      .replaceAll("&", "&amp;")
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;")
+      .replaceAll('"', "&quot;");
   }
 
   function statusLabel(s) {
     return ({
-      enquiry: "Enquiry",
-      quoted: "Quoted",
-      scheduled: "Scheduled",
-      on_site: "On site",
-      complete: "Complete",
-      to_invoice: "To invoice",
-      invoiced: "Invoiced",
+      enquiry: "Enquiry", quoted: "Quoted", scheduled: "Scheduled",
+      on_site: "On site", complete: "Complete", to_invoice: "To invoice", invoiced: "Invoiced",
     })[s] || s;
   }
 
+  function classLabel(s) {
+    return ({ trade: "Trade", apprentice: "Apprentice", supervisor: "Supervisor" })[s] || s;
+  }
+
+  const views = ["loginView", "jobsTab", "jobView", "taskView", "newJobView", "customersTab", "employeesTab", "catalogueTab"];
   function show(id) {
-    ["loginView", "appView", "jobView", "newJobView"].forEach((v) => {
-      $(v).hidden = v !== id;
-    });
+    views.forEach((v) => { const el = $(v); if (el) el.hidden = v !== id; });
+  }
+
+  function setTab(name) {
+    document.querySelectorAll("#nav button").forEach((b) => b.classList.toggle("on", b.dataset.tab === name));
   }
 
   function persistSession() {
     if (state.session) sessionStorage.setItem("jobs.session", JSON.stringify(state.session));
     else sessionStorage.removeItem("jobs.session");
+  }
+
+  function fillTimeSelects() {
+    const opts = [];
+    for (let m = 0; m < 1440; m += 15) {
+      opts.push(`<option value="${hhmm(m)}">${hhmm(m)}</option>`);
+    }
+    $("labourStart").innerHTML = opts.join("");
+    $("labourFinish").innerHTML = opts.join("");
+    $("labourStart").value = "07:00";
+    $("labourFinish").value = "15:30";
+  }
+
+  function updateLabourPreview() {
+    try {
+      const mins = duration(parseClock($("labourStart").value), parseClock($("labourFinish").value));
+      $("labourPreview").textContent = `Duration ${hhmm(mins)}`;
+    } catch {
+      $("labourPreview").textContent = "";
+    }
   }
 
   async function loadMe() {
@@ -321,53 +507,58 @@ const JOBS = (() => {
     $("brand").textContent = state.operator?.name || "Jobs";
     $("whoAmI").textContent = `${state.profile.display_name} · ${state.profile.role}`;
     $("topRight").hidden = false;
+    $("nav").hidden = false;
+    document.body.classList.toggle("field", !isOffice());
   }
 
   async function loadJobs() {
-    const q = "?select=*,customers(name),sites(label,address)&order=created_at.desc";
-    state.jobs = await rest("GET", "jobs", { query: q });
-    renderList();
+    state.jobs = await rest("GET", "jobs", { query: "?select=*,customers(name),sites(label,address)&order=created_at.desc" });
+    renderJobs();
   }
 
   async function loadCustomers() {
     state.customers = await rest("GET", "customers", { query: "?select=*&order=name.asc" });
-    fillCustomers();
+    $("customerOptions").innerHTML = state.customers.map((c) => `<option value="${escapeHtml(c.name)}"></option>`).join("");
+    $("custBody").innerHTML = state.customers.map((c) =>
+      `<tr><td>${escapeHtml(c.name)}</td><td>${escapeHtml(c.phone || "")}</td><td>${escapeHtml(c.email || "")}</td></tr>`
+    ).join("");
   }
 
-  async function loadSites(customerId) {
-    if (!customerId) {
-      state.sites = [];
-      fillSites();
-      return;
+  async function loadEmployees() {
+    state.employees = await rest("GET", "employees", { query: "?select=*&order=name.asc" });
+    $("empBody").innerHTML = state.employees.map((e) =>
+      `<tr><td>${escapeHtml(e.name)}</td><td>${classLabel(e.classification)}</td></tr>`
+    ).join("");
+    $("employeeChecks").innerHTML = state.employees.filter((e) => e.active !== false).map((e) =>
+      `<label><input type="checkbox" name="emp" value="${e.id}" /> ${escapeHtml(e.name)} <span class="meta">${classLabel(e.classification)}</span></label>`
+    ).join("") || `<p class="meta">Add employees first.</p>`;
+  }
+
+  async function loadCatalogue() {
+    state.materialCat = await rest("GET", "material_catalogue", { query: "?select=*&order=name.asc" });
+    state.equipmentCat = await rest("GET", "equipment_catalogue", { query: "?select=*&order=name.asc" });
+    let matCosts = [], eqCosts = [];
+    if (isOffice()) {
+      matCosts = await rest("GET", "material_catalogue_costs", { query: "?select=*" });
+      eqCosts = await rest("GET", "equipment_catalogue_costs", { query: "?select=*" });
     }
-    state.sites = await rest("GET", "sites", { query: `?customer_id=eq.${customerId}&select=*&order=label.asc` });
-    fillSites();
+    const mc = Object.fromEntries(matCosts.map((r) => [r.catalogue_id, r.unit_cost_cents]));
+    const ec = Object.fromEntries(eqCosts.map((r) => [r.catalogue_id, r.unit_cost_cents]));
+    $("matCatBody").innerHTML = state.materialCat.map((r) =>
+      `<tr><td>${escapeHtml(r.name)}</td><td>${escapeHtml(r.unit)}</td><td class="office-only">${dollars(mc[r.id])}</td></tr>`
+    ).join("");
+    $("eqCatBody").innerHTML = state.equipmentCat.map((r) =>
+      `<tr><td>${escapeHtml(r.name)}</td><td>${escapeHtml(r.unit)}</td><td class="office-only">${dollars(ec[r.id])}</td></tr>`
+    ).join("");
+    $("materialCat").innerHTML = `<option value="">Ad-hoc</option>` + state.materialCat.map((r) =>
+      `<option value="${r.id}" data-name="${escapeHtml(r.name)}" data-cost="${mc[r.id] ?? ""}">${escapeHtml(r.name)}</option>`
+    ).join("");
+    $("equipmentCat").innerHTML = `<option value="">Ad-hoc</option>` + state.equipmentCat.map((r) =>
+      `<option value="${r.id}" data-name="${escapeHtml(r.name)}" data-cost="${ec[r.id] ?? ""}">${escapeHtml(r.name)}</option>`
+    ).join("");
   }
 
-  function fillCustomers() {
-    const sel = $("customerSelect");
-    sel.innerHTML = state.customers
-      .map((c) => `<option value="${c.id}">${escapeHtml(c.name)}</option>`)
-      .join("");
-    if (!sel.value && state.customers[0]) sel.value = state.customers[0].id;
-  }
-
-  function fillSites() {
-    const sel = $("siteSelect");
-    sel.innerHTML =
-      `<option value="">No site</option>` +
-      state.sites.map((s) => `<option value="${s.id}">${escapeHtml(s.label)}</option>`).join("");
-  }
-
-  function escapeHtml(s) {
-    return String(s ?? "")
-      .replaceAll("&", "&amp;")
-      .replaceAll("<", "&lt;")
-      .replaceAll(">", "&gt;")
-      .replaceAll('"', "&quot;");
-  }
-
-  function renderList() {
+  function renderJobs() {
     const term = $("search").value.trim().toLowerCase();
     const status = $("statusFilter").value;
     const items = state.jobs.filter((j) => {
@@ -376,52 +567,88 @@ const JOBS = (() => {
       if (status && j.status !== status) return false;
       return true;
     });
-    $("jobList").innerHTML = items
-      .map(
-        (j) => `<li data-id="${j.id}">
-          <div class="num">${escapeHtml(j.number)} · ${statusLabel(j.status)}</div>
-          <strong>${escapeHtml(j.title)}</strong>
-          <div class="meta">${escapeHtml(j.customers?.name || "")}${j.sites?.label ? " · " + escapeHtml(j.sites.label) : ""}</div>
-        </li>`
-      )
-      .join("") || `<li>No jobs</li>`;
+    $("jobList").innerHTML = items.map((j) => `<li data-id="${j.id}">
+      <div class="num">${escapeHtml(j.number)} · ${statusLabel(j.status)}</div>
+      <strong>${escapeHtml(j.title)}</strong>
+      <div class="meta">${escapeHtml(j.customers?.name || "")}${j.sites?.label ? " · " + escapeHtml(j.sites.label) : ""}</div>
+    </li>`).join("") || `<li>No jobs</li>`;
   }
 
   async function openJob(id) {
-    const job = await rest("GET", "jobs", {
-      query: `?id=eq.${id}&select=*,customers(name,phone),sites(label,address)`,
-    });
+    const job = await rest("GET", "jobs", { query: `?id=eq.${id}&select=*,customers(name,phone),sites(label,address)` });
     state.currentJob = job[0];
     if (!state.currentJob) return;
     $("jobTitle").textContent = `${state.currentJob.number} · ${state.currentJob.title}`;
-    $("jobMeta").textContent = `${statusLabel(state.currentJob.status)} · ${state.currentJob.model}`;
+    $("jobMeta").textContent = statusLabel(state.currentJob.status);
     const c = state.currentJob.customers;
     const s = state.currentJob.sites;
     $("jobCustomer").textContent = [c?.name, c?.phone, s?.label, s?.address].filter(Boolean).join(" · ") || "—";
-    $("labourWho").value = state.profile.display_name || "";
-    $("labourDate").value = new Date().toISOString().slice(0, 10);
-    $("labourHours").value = "";
-    $("labourTask").value = "";
-    await loadLabour();
+    await loadTasks();
     show("jobView");
+    setTab("jobs");
   }
 
-  async function loadLabour() {
-    const rows = await rest("GET", "labour_entries", {
-      query: `?job_id=eq.${state.currentJob.id}&select=*&order=work_date.desc,created_at.desc`,
+  async function loadTasks() {
+    const tasks = await rest("GET", "job_tasks", { query: `?job_id=eq.${state.currentJob.id}&select=*&order=number.asc` });
+    $("taskList").innerHTML = tasks.map((t) => `<li data-id="${t.id}">
+      <div class="num">${escapeHtml(t.number)}</div>
+      <strong>${escapeHtml(t.title)}</strong>
+    </li>`).join("") || `<li>No tasks</li>`;
+  }
+
+  async function openTask(id) {
+    const tasks = await rest("GET", "job_tasks", { query: `?id=eq.${id}&select=*` });
+    state.currentTask = tasks[0];
+    $("taskTitle").textContent = `${state.currentJob.number} ${state.currentTask.number} · ${state.currentTask.title}`;
+    $("taskMeta").textContent = state.currentJob.title;
+    $("labourDate").value = new Date().toISOString().slice(0, 10);
+    fillTimeSelects();
+    updateLabourPreview();
+    await loadEmployees();
+    await loadCatalogue();
+    await loadTaskLines();
+    show("taskView");
+  }
+
+  async function loadTaskLines() {
+    const tid = state.currentTask.id;
+    const labour = await rest("GET", "labour_entries", {
+      query: `?task_id=eq.${tid}&select=*,employees(name,classification)&order=work_date.desc,created_at.desc`,
     });
-    $("labourBody").innerHTML = rows
-      .map(
-        (r) => `<tr>
-          <td>${escapeHtml(r.who)}</td>
-          <td>${escapeHtml(r.work_date)}</td>
-          <td>${hhmm(r.minutes)}</td>
-          <td>${escapeHtml(r.task || "")}</td>
-        </tr>`
-      )
-      .join("");
-    const total = rows.reduce((a, r) => a + (r.minutes || 0), 0);
-    $("labourTotal").textContent = rows.length ? `Total ${hhmm(total)}` : "No labour yet";
+    $("labourBody").innerHTML = labour.map((r) => `<tr>
+      <td>${escapeHtml(r.employees?.name || r.who || "")}</td>
+      <td>${escapeHtml(r.work_date)}</td>
+      <td>${r.start_minutes != null ? hhmm(r.start_minutes) : "—"}</td>
+      <td>${r.finish_minutes != null ? hhmm(r.finish_minutes) : "—"}</td>
+      <td>${hhmm(r.minutes)}</td>
+      <td>${escapeHtml(r.task || "")}</td>
+    </tr>`).join("");
+    const total = labour.reduce((a, r) => a + (r.minutes || 0), 0);
+    $("labourTotal").textContent = labour.length ? `Total ${hhmm(total)}` : "No labour yet";
+
+    const mats = await rest("GET", "material_entries", { query: `?task_id=eq.${tid}&select=*&order=created_at.desc` });
+    let mcosts = {};
+    if (isOffice() && mats.length) {
+      const ids = mats.map((m) => m.id).join(",");
+      const rows = await rest("GET", "material_costs", { query: `?material_id=in.(${ids})&select=*` });
+      mcosts = Object.fromEntries(rows.map((r) => [r.material_id, r.unit_cost_cents]));
+    }
+    $("materialBody").innerHTML = mats.map((r) => `<tr>
+      <td>${escapeHtml(r.description)}</td><td>${r.qty}</td>
+      <td class="office-only">${dollars(mcosts[r.id])}</td>
+    </tr>`).join("");
+
+    const eqs = await rest("GET", "equipment_entries", { query: `?task_id=eq.${tid}&select=*&order=created_at.desc` });
+    let ecosts = {};
+    if (isOffice() && eqs.length) {
+      const ids = eqs.map((m) => m.id).join(",");
+      const rows = await rest("GET", "equipment_costs", { query: `?equipment_id=in.(${ids})&select=*` });
+      ecosts = Object.fromEntries(rows.map((r) => [r.equipment_id, r.unit_cost_cents]));
+    }
+    $("equipmentBody").innerHTML = eqs.map((r) => `<tr>
+      <td>${escapeHtml(r.description)}</td><td>${r.qty}</td>
+      <td class="office-only">${dollars(ecosts[r.id])}</td>
+    </tr>`).join("");
   }
 
   async function afterLogin(session) {
@@ -429,18 +656,58 @@ const JOBS = (() => {
     persistSession();
     await loadMe();
     await loadJobs();
-    show("appView");
+    show("jobsTab");
+    setTab("jobs");
+  }
+
+  function findCustomerByName(name) {
+    const n = name.trim().toLowerCase();
+    return state.customers.find((c) => c.name.toLowerCase() === n);
+  }
+
+  async function ensureCustomer() {
+    const typed = $("customerTypeahead").value.trim();
+    if (!typed) throw new Error("Customer required");
+    const existing = findCustomerByName(typed);
+    if (existing) return existing;
+    return new Promise((resolve, reject) => {
+      state.pendingCustomerName = typed;
+      $("newCustomerPrompt").textContent = `“${typed}” is not set up yet.`;
+      $("dialogPhone").value = "";
+      const dlg = $("newCustomerDialog");
+      const onClose = () => {
+        dlg.removeEventListener("close", onClose);
+        if (dlg.returnValue !== "ok") reject(new Error("Customer not set up"));
+      };
+      dlg.addEventListener("close", onClose);
+      dlg.showModal();
+      $("newCustomerDialogForm").onsubmit = async (e) => {
+        e.preventDefault();
+        try {
+          const created = await rest("POST", "customers", {
+            body: { name: state.pendingCustomerName, phone: $("dialogPhone").value.trim() || null },
+          });
+          await loadCustomers();
+          $("customerTypeahead").value = created[0].name;
+          dlg.returnValue = "ok";
+          dlg.close("ok");
+          resolve(created[0]);
+        } catch (err) {
+          reject(err);
+        }
+      };
+      $("dialogCancel").onclick = () => dlg.close("cancel");
+    });
   }
 
   $("loginForm").addEventListener("submit", async (e) => {
     e.preventDefault();
     $("loginError").hidden = true;
     try {
-      const session = await auth("token?grant_type=password", {
+      await afterLogin(await auth("token?grant_type=password", {
         email: $("email").value.trim(),
         password: $("password").value,
-      });
-      await afterLogin(session);
+      }));
     } catch (err) {
       $("loginError").textContent = err.message;
       $("loginError").hidden = false;
@@ -449,73 +716,70 @@ const JOBS = (() => {
 
   $("signOut").addEventListener("click", () => {
     state.session = null;
-    state.profile = null;
     persistSession();
     $("topRight").hidden = true;
+    $("nav").hidden = true;
     $("brand").textContent = "Jobs";
     show("loginView");
   });
 
-  $("search").addEventListener("input", renderList);
-  $("statusFilter").addEventListener("change", renderList);
+  document.querySelectorAll("#nav button").forEach((b) => {
+    b.addEventListener("click", async () => {
+      const tab = b.dataset.tab;
+      setTab(tab);
+      if (tab === "jobs") { await loadJobs(); show("jobsTab"); }
+      if (tab === "customers") { await loadCustomers(); show("customersTab"); }
+      if (tab === "employees") { await loadEmployees(); show("employeesTab"); }
+      if (tab === "catalogue") { await loadCatalogue(); show("catalogueTab"); }
+    });
+  });
 
+  $("search").addEventListener("input", renderJobs);
+  $("statusFilter").addEventListener("change", renderJobs);
   $("jobList").addEventListener("click", (e) => {
     const li = e.target.closest("li[data-id]");
     if (li) openJob(li.dataset.id);
   });
-
-  $("backToList").addEventListener("click", async () => {
-    await loadJobs();
-    show("appView");
+  $("taskList").addEventListener("click", (e) => {
+    const li = e.target.closest("li[data-id]");
+    if (li) openTask(li.dataset.id);
   });
+  $("backToList").addEventListener("click", async () => { await loadJobs(); show("jobsTab"); });
+  $("backToJob").addEventListener("click", () => openJob(state.currentJob.id));
+  $("labourStart").addEventListener("change", updateLabourPreview);
+  $("labourFinish").addEventListener("change", updateLabourPreview);
 
   $("newJobBtn").addEventListener("click", async () => {
     $("newJobError").hidden = true;
     await loadCustomers();
-    await loadSites($("customerSelect").value);
+    $("siteSelect").innerHTML = `<option value="">No site</option>`;
     show("newJobView");
   });
+  $("cancelNewJob").addEventListener("click", () => show("jobsTab"));
 
-  $("cancelNewJob").addEventListener("click", () => show("appView"));
-
-  $("customerSelect").addEventListener("change", () => loadSites($("customerSelect").value));
-
-  $("addCustomerBtn").addEventListener("click", async () => {
-    $("newJobError").hidden = true;
-    try {
-      const name = $("newCustomerName").value.trim();
-      if (!name) throw new Error("Customer name required");
-      const created = await rest("POST", "customers", {
-        body: { name, phone: $("newCustomerPhone").value.trim() || null },
-      });
-      $("newCustomerName").value = "";
-      $("newCustomerPhone").value = "";
-      await loadCustomers();
-      $("customerSelect").value = created[0].id;
-      await loadSites(created[0].id);
-    } catch (err) {
-      $("newJobError").textContent = err.message;
-      $("newJobError").hidden = false;
-    }
+  $("customerTypeahead").addEventListener("change", async () => {
+    const c = findCustomerByName($("customerTypeahead").value);
+    if (!c) return;
+    const sites = await rest("GET", "sites", { query: `?customer_id=eq.${c.id}&select=*&order=label.asc` });
+    $("siteSelect").innerHTML = `<option value="">No site</option>` + sites.map((s) =>
+      `<option value="${s.id}">${escapeHtml(s.label)}</option>`
+    ).join("");
   });
 
   $("addSiteBtn").addEventListener("click", async () => {
-    $("newJobError").hidden = true;
     try {
-      const customerId = $("customerSelect").value;
-      if (!customerId) throw new Error("Pick a customer first");
+      const c = findCustomerByName($("customerTypeahead").value) || await ensureCustomer();
       const label = $("newSiteLabel").value.trim();
       if (!label) throw new Error("Site label required");
       const created = await rest("POST", "sites", {
-        body: {
-          customer_id: customerId,
-          label,
-          address: $("newSiteAddress").value.trim() || null,
-        },
+        body: { customer_id: c.id, label, address: $("newSiteAddress").value.trim() || null },
       });
       $("newSiteLabel").value = "";
       $("newSiteAddress").value = "";
-      await loadSites(customerId);
+      const sites = await rest("GET", "sites", { query: `?customer_id=eq.${c.id}&select=*&order=label.asc` });
+      $("siteSelect").innerHTML = `<option value="">No site</option>` + sites.map((s) =>
+        `<option value="${s.id}">${escapeHtml(s.label)}</option>`
+      ).join("");
       $("siteSelect").value = created[0].id;
     } catch (err) {
       $("newJobError").textContent = err.message;
@@ -527,21 +791,25 @@ const JOBS = (() => {
     e.preventDefault();
     $("newJobError").hidden = true;
     try {
-      const customerId = $("customerSelect").value;
-      if (!customerId) throw new Error("Customer required");
-      const body = {
+      const customer = await ensureCustomer();
+      const created = await rest("POST", "jobs", { body: {
         title: $("newTitle").value.trim(),
         summary: $("newSummary").value.trim() || null,
-        model: $("newModel").value,
         status: $("newStatus").value,
-        scheduled_on: $("newScheduled").value || null,
-        customer_id: customerId,
+        model: "tm",
+        customer_id: customer.id,
         site_id: $("siteSelect").value || null,
         number: "",
-      };
-      const created = await rest("POST", "jobs", { body });
+      }});
+      await rest("POST", "job_tasks", { body: {
+        job_id: created[0].id,
+        title: $("firstTaskTitle").value.trim() || "General",
+        number: "",
+        status: $("newStatus").value,
+      }});
       $("newTitle").value = "";
       $("newSummary").value = "";
+      $("firstTaskTitle").value = "";
       await loadJobs();
       await openJob(created[0].id);
     } catch (err) {
@@ -550,45 +818,178 @@ const JOBS = (() => {
     }
   });
 
+  $("newTaskForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    $("taskError").hidden = true;
+    try {
+      await rest("POST", "job_tasks", { body: {
+        job_id: state.currentJob.id,
+        title: $("newTaskTitle").value.trim(),
+        number: "",
+        status: state.currentJob.status,
+      }});
+      $("newTaskTitle").value = "";
+      await loadTasks();
+    } catch (err) {
+      $("taskError").textContent = err.message;
+      $("taskError").hidden = false;
+    }
+  });
+
   $("labourForm").addEventListener("submit", async (e) => {
     e.preventDefault();
     $("labourError").hidden = true;
     try {
-      const minutes = minutesFromHHMM($("labourHours").value);
-      await rest("POST", "labour_entries", {
-        body: {
+      const ids = [...document.querySelectorAll("#employeeChecks input:checked")].map((i) => i.value);
+      if (!ids.length) throw new Error("Select at least one employee");
+      const start = parseClock($("labourStart").value);
+      const finish = parseClock($("labourFinish").value);
+      const note = $("labourNote").value.trim() || null;
+      const date = $("labourDate").value;
+      for (const employee_id of ids) {
+        const emp = state.employees.find((x) => x.id === employee_id);
+        await rest("POST", "labour_entries", { body: {
           job_id: state.currentJob.id,
-          who: $("labourWho").value.trim(),
-          work_date: $("labourDate").value,
-          minutes,
-          task: $("labourTask").value.trim() || null,
-        },
-      });
-      $("labourHours").value = "";
-      $("labourTask").value = "";
-      await loadLabour();
+          task_id: state.currentTask.id,
+          employee_id,
+          who: emp?.name || "",
+          work_date: date,
+          start_minutes: start,
+          finish_minutes: finish,
+          task: note,
+        }});
+      }
+      $("labourNote").value = "";
+      document.querySelectorAll("#employeeChecks input").forEach((i) => { i.checked = false; });
+      await loadTaskLines();
     } catch (err) {
       $("labourError").textContent = err.message;
       $("labourError").hidden = false;
     }
   });
 
+  async function addLine(kind) {
+    const isMat = kind === "material";
+    const err = $(isMat ? "materialError" : "equipmentError");
+    err.hidden = true;
+    try {
+      const cat = $(isMat ? "materialCat" : "equipmentCat");
+      const opt = cat.selectedOptions[0];
+      const desc = $(isMat ? "materialDesc" : "equipmentDesc").value.trim() || opt?.dataset.name || "";
+      if (!desc) throw new Error("Description required");
+      const qty = Number($(isMat ? "materialQty" : "equipmentQty").value);
+      const costText = $(isMat ? "materialCost" : "equipmentCost").value;
+      const table = isMat ? "material_entries" : "equipment_entries";
+      const created = await rest("POST", table, { body: {
+        job_id: state.currentJob.id,
+        task_id: state.currentTask.id,
+        catalogue_id: cat.value || null,
+        description: desc,
+        qty,
+      }});
+      if (isOffice() && costText) {
+        const cents = toCents(costText);
+        if (isMat) {
+          await rest("POST", "material_costs", { body: { material_id: created[0].id, unit_cost_cents: cents } });
+        } else {
+          await rest("POST", "equipment_costs", { body: { equipment_id: created[0].id, unit_cost_cents: cents } });
+        }
+      }
+      $(isMat ? "materialDesc" : "equipmentDesc").value = "";
+      await loadTaskLines();
+    } catch (e) {
+      err.textContent = e.message;
+      err.hidden = false;
+    }
+  }
+
+  $("materialForm").addEventListener("submit", (e) => { e.preventDefault(); addLine("material"); });
+  $("equipmentForm").addEventListener("submit", (e) => { e.preventDefault(); addLine("equipment"); });
+
+  $("materialCat").addEventListener("change", () => {
+    const opt = $("materialCat").selectedOptions[0];
+    if (opt?.dataset.name) $("materialDesc").value = opt.dataset.name;
+    if (opt?.dataset.cost) $("materialCost").value = dollars(opt.dataset.cost);
+  });
+  $("equipmentCat").addEventListener("change", () => {
+    const opt = $("equipmentCat").selectedOptions[0];
+    if (opt?.dataset.name) $("equipmentDesc").value = opt.dataset.name;
+    if (opt?.dataset.cost) $("equipmentCost").value = dollars(opt.dataset.cost);
+  });
+
+  $("customerForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    $("custError").hidden = true;
+    try {
+      await rest("POST", "customers", { body: {
+        name: $("custName").value.trim(),
+        phone: $("custPhone").value.trim() || null,
+        email: $("custEmail").value.trim() || null,
+      }});
+      $("custName").value = ""; $("custPhone").value = ""; $("custEmail").value = "";
+      await loadCustomers();
+    } catch (err) {
+      $("custError").textContent = err.message;
+      $("custError").hidden = false;
+    }
+  });
+
+  $("employeeForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    $("empError").hidden = true;
+    try {
+      await rest("POST", "employees", { body: {
+        name: $("empName").value.trim(),
+        classification: $("empClass").value,
+      }});
+      $("empName").value = "";
+      await loadEmployees();
+    } catch (err) {
+      $("empError").textContent = err.message;
+      $("empError").hidden = false;
+    }
+  });
+
+  async function addCat(kind) {
+    const isMat = kind === "material";
+    const err = $(isMat ? "matCatError" : "eqCatError");
+    err.hidden = true;
+    try {
+      const created = await rest("POST", isMat ? "material_catalogue" : "equipment_catalogue", { body: {
+        name: $(isMat ? "matCatName" : "eqCatName").value.trim(),
+        unit: $(isMat ? "matCatUnit" : "eqCatUnit").value.trim() || (isMat ? "ea" : "day"),
+      }});
+      const costText = $(isMat ? "matCatCost" : "eqCatCost").value;
+      if (isOffice() && costText) {
+        const cents = toCents(costText);
+        await rest("POST", isMat ? "material_catalogue_costs" : "equipment_catalogue_costs", {
+          body: { catalogue_id: created[0].id, unit_cost_cents: cents },
+        });
+      }
+      $(isMat ? "matCatName" : "eqCatName").value = "";
+      await loadCatalogue();
+    } catch (e) {
+      err.textContent = e.message;
+      err.hidden = false;
+    }
+  }
+  $("matCatForm").addEventListener("submit", (e) => { e.preventDefault(); addCat("material"); });
+  $("eqCatForm").addEventListener("submit", (e) => { e.preventDefault(); addCat("equipment"); });
+
   async function boot() {
+    fillTimeSelects();
     if (!window.CONFIG?.url || !window.CONFIG?.anonKey) {
       $("loginError").textContent = "Missing config.js";
       $("loginError").hidden = false;
       return;
     }
     const raw = sessionStorage.getItem("jobs.session");
-    if (!raw) {
-      show("loginView");
-      return;
-    }
+    if (!raw) { show("loginView"); return; }
     try {
       state.session = JSON.parse(raw);
       await loadMe();
       await loadJobs();
-      show("appView");
+      show("jobsTab");
     } catch {
       state.session = null;
       persistSession();
@@ -597,7 +998,6 @@ const JOBS = (() => {
   }
 
   boot();
-  return { state, hhmm, minutesFromHHMM };
 })();
 
   </script>
