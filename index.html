@@ -1,0 +1,605 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Jobs</title>
+  <style>
+:root {
+  --bg: #f4f4f5;
+  --card: #ffffff;
+  --ink: #1d1d1f;
+  --muted: #6e6e73;
+  --line: #d2d2d7;
+  --accent: #1c3d5a;
+  --danger: #b42318;
+}
+* { box-sizing: border-box; }
+html, body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font: 16px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+.top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 24px;
+  background: var(--card);
+  border-bottom: 1px solid var(--line);
+}
+.brand { font-weight: 650; letter-spacing: -0.02em; }
+.top-right { display: flex; gap: 12px; align-items: center; color: var(--muted); font-size: 14px; }
+main { max-width: 960px; margin: 24px auto; padding: 0 16px 48px; }
+.card {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 20px;
+  margin: 16px 0;
+}
+.narrow { max-width: 420px; }
+h1 { font-size: 22px; margin: 0 0 16px; letter-spacing: -0.03em; }
+h2 { font-size: 15px; margin: 0 0 12px; color: var(--muted); font-weight: 600; }
+label { display: block; margin: 0 0 12px; font-size: 13px; color: var(--muted); }
+input, select {
+  display: block;
+  width: 100%;
+  margin-top: 4px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  font: inherit;
+  color: var(--ink);
+  background: #fff;
+}
+button {
+  background: var(--accent);
+  color: #fff;
+  border: 0;
+  border-radius: 8px;
+  padding: 10px 14px;
+  font: inherit;
+  cursor: pointer;
+}
+button.link, .link {
+  background: none;
+  color: var(--accent);
+  padding: 0;
+  margin-bottom: 12px;
+}
+.toolbar { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+.toolbar input, .toolbar select { width: auto; min-width: 180px; flex: 1; }
+.job-list { list-style: none; padding: 0; margin: 0; }
+.job-list li {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 14px 16px;
+  margin: 8px 0;
+  cursor: pointer;
+}
+.job-list li:hover { border-color: var(--accent); }
+.job-list .num { color: var(--muted); font-size: 13px; }
+.grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+@media (max-width: 720px) { .grid { grid-template-columns: 1fr; } }
+table { width: 100%; border-collapse: collapse; }
+th, td { text-align: left; padding: 8px 6px; border-bottom: 1px solid var(--line); font-size: 14px; }
+.meta { color: var(--muted); font-size: 14px; }
+.error { color: var(--danger); font-size: 14px; }
+details { margin: 8px 0 16px; }
+summary { cursor: pointer; color: var(--accent); }
+
+</style>
+</head>
+<body>
+  <header class="top">
+    <div class="brand" id="brand">Jobs</div>
+    <div class="top-right" id="topRight" hidden>
+      <span id="whoAmI"></span>
+      <button type="button" id="signOut">Sign out</button>
+    </div>
+  </header>
+
+  <main>
+    <section id="loginView" class="card narrow">
+      <h1>Sign in</h1>
+      <form id="loginForm">
+        <label>Email<input id="email" type="email" autocomplete="username" required /></label>
+        <label>Password<input id="password" type="password" autocomplete="current-password" required /></label>
+        <p class="error" id="loginError" hidden></p>
+        <button type="submit">Sign in</button>
+      </form>
+    </section>
+
+    <section id="appView" hidden>
+      <div class="toolbar">
+        <input id="search" type="search" placeholder="Search jobs" />
+        <select id="statusFilter">
+          <option value="">All statuses</option>
+          <option value="enquiry">Enquiry</option>
+          <option value="quoted">Quoted</option>
+          <option value="scheduled">Scheduled</option>
+          <option value="on_site">On site</option>
+          <option value="complete">Complete</option>
+          <option value="to_invoice">To invoice</option>
+          <option value="invoiced">Invoiced</option>
+        </select>
+        <button type="button" id="newJobBtn">New job</button>
+      </div>
+      <div id="listError" class="error" hidden></div>
+      <ul id="jobList" class="job-list"></ul>
+    </section>
+
+    <section id="jobView" hidden>
+      <button type="button" class="link" id="backToList">← Jobs</button>
+      <div class="job-head">
+        <h1 id="jobTitle"></h1>
+        <p class="meta" id="jobMeta"></p>
+      </div>
+      <div class="grid">
+        <div class="card">
+          <h2>Customer / site</h2>
+          <p id="jobCustomer"></p>
+        </div>
+        <div class="card">
+          <h2>Add labour</h2>
+          <form id="labourForm">
+            <label>Who<input id="labourWho" required /></label>
+            <label>Date<input id="labourDate" type="date" required /></label>
+            <label>Hours (HH:MM)<input id="labourHours" placeholder="04:30" pattern="^[0-9]{1,3}:[0-5][0-9]$" required /></label>
+            <label>Task<input id="labourTask" /></label>
+            <p class="error" id="labourError" hidden></p>
+            <button type="submit">Add hours</button>
+          </form>
+        </div>
+      </div>
+      <div class="card">
+        <h2>Labour</h2>
+        <table>
+          <thead>
+            <tr><th>Who</th><th>Date</th><th>Hours</th><th>Task</th></tr>
+          </thead>
+          <tbody id="labourBody"></tbody>
+        </table>
+        <p class="meta" id="labourTotal"></p>
+      </div>
+    </section>
+
+    <section id="newJobView" hidden>
+      <button type="button" class="link" id="cancelNewJob">← Jobs</button>
+      <div class="card narrow">
+        <h1>New job</h1>
+        <form id="newJobForm">
+          <label>Title<input id="newTitle" required /></label>
+          <label>Summary<input id="newSummary" /></label>
+          <label>Model
+            <select id="newModel">
+              <option value="tm">T&amp;M</option>
+              <option value="quoted">Quoted</option>
+              <option value="measured">Measured</option>
+            </select>
+          </label>
+          <label>Status
+            <select id="newStatus">
+              <option value="enquiry">Enquiry</option>
+              <option value="quoted">Quoted</option>
+              <option value="scheduled">Scheduled</option>
+              <option value="on_site">On site</option>
+            </select>
+          </label>
+          <label>Scheduled on<input id="newScheduled" type="date" /></label>
+          <label>Customer
+            <select id="customerSelect" required></select>
+          </label>
+          <details>
+            <summary>New customer</summary>
+            <label>Name<input id="newCustomerName" /></label>
+            <label>Phone<input id="newCustomerPhone" /></label>
+            <button type="button" id="addCustomerBtn">Save customer</button>
+          </details>
+          <label>Site
+            <select id="siteSelect">
+              <option value="">No site</option>
+            </select>
+          </label>
+          <details>
+            <summary>New site</summary>
+            <label>Label<input id="newSiteLabel" /></label>
+            <label>Address<input id="newSiteAddress" /></label>
+            <button type="button" id="addSiteBtn">Save site</button>
+          </details>
+          <p class="error" id="newJobError" hidden></p>
+          <button type="submit">Create job</button>
+        </form>
+      </div>
+    </section>
+  </main>
+  <script>
+window.CONFIG = { url: "https://ptoexwskxhbtepgsncqq.supabase.co", anonKey: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InB0b2V4d3NreGhidGVwZ3NuY3FxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg2MDQwNDIsImV4cCI6MjEwNDE4MDA0Mn0.HYOondB7Y-8ohsl9Tj2dzMC6syq_9KMcCJu0G5dE8H4" };
+
+const JOBS = (() => {
+  const state = {
+    session: null,
+    profile: null,
+    operator: null,
+    jobs: [],
+    customers: [],
+    sites: [],
+    currentJob: null,
+  };
+
+  const $ = (id) => document.getElementById(id);
+
+  function headers(extra = {}) {
+    const h = {
+      apikey: CONFIG.anonKey,
+      "Content-Type": "application/json",
+      ...extra,
+    };
+    if (state.session?.access_token) {
+      h.Authorization = `Bearer ${state.session.access_token}`;
+    } else {
+      h.Authorization = `Bearer ${CONFIG.anonKey}`;
+    }
+    return h;
+  }
+
+  async function auth(path, body) {
+    const res = await fetch(`${CONFIG.url}/auth/v1/${path}`, {
+      method: "POST",
+      headers: headers(),
+      body: JSON.stringify(body),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error_description || data.msg || data.error || "Auth failed");
+    return data;
+  }
+
+  async function rest(method, table, { query = "", body, single } = {}) {
+    const res = await fetch(`${CONFIG.url}/rest/v1/${table}${query}`, {
+      method,
+      headers: {
+        ...headers(),
+        Prefer: single ? "return=representation,resolution=merge-duplicates" : "return=representation",
+        ...(single ? { Accept: "application/vnd.pgrst.object+json" } : {}),
+      },
+      body: body ? JSON.stringify(body) : undefined,
+    });
+    if (res.status === 204) return null;
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      const msg = data.message || data.hint || data.error || JSON.stringify(data);
+      throw new Error(msg);
+    }
+    return data;
+  }
+
+  function minutesFromHHMM(value) {
+    const m = String(value).trim().match(/^(\d{1,3}):([0-5]\d)$/);
+    if (!m) throw new Error("Use HH:MM");
+    return Number(m[1]) * 60 + Number(m[2]);
+  }
+
+  function hhmm(minutes) {
+    const n = Number(minutes) || 0;
+    const h = Math.floor(n / 60);
+    const m = n % 60;
+    return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+  }
+
+  function statusLabel(s) {
+    return ({
+      enquiry: "Enquiry",
+      quoted: "Quoted",
+      scheduled: "Scheduled",
+      on_site: "On site",
+      complete: "Complete",
+      to_invoice: "To invoice",
+      invoiced: "Invoiced",
+    })[s] || s;
+  }
+
+  function show(id) {
+    ["loginView", "appView", "jobView", "newJobView"].forEach((v) => {
+      $(v).hidden = v !== id;
+    });
+  }
+
+  function persistSession() {
+    if (state.session) sessionStorage.setItem("jobs.session", JSON.stringify(state.session));
+    else sessionStorage.removeItem("jobs.session");
+  }
+
+  async function loadMe() {
+    const profiles = await rest("GET", "profiles", { query: `?id=eq.${state.session.user.id}&select=*` });
+    state.profile = profiles[0];
+    if (!state.profile) throw new Error("No profile for this login");
+    const ops = await rest("GET", "operators", { query: `?id=eq.${state.profile.operator_id}&select=*` });
+    state.operator = ops[0];
+    $("brand").textContent = state.operator?.name || "Jobs";
+    $("whoAmI").textContent = `${state.profile.display_name} · ${state.profile.role}`;
+    $("topRight").hidden = false;
+  }
+
+  async function loadJobs() {
+    const q = "?select=*,customers(name),sites(label,address)&order=created_at.desc";
+    state.jobs = await rest("GET", "jobs", { query: q });
+    renderList();
+  }
+
+  async function loadCustomers() {
+    state.customers = await rest("GET", "customers", { query: "?select=*&order=name.asc" });
+    fillCustomers();
+  }
+
+  async function loadSites(customerId) {
+    if (!customerId) {
+      state.sites = [];
+      fillSites();
+      return;
+    }
+    state.sites = await rest("GET", "sites", { query: `?customer_id=eq.${customerId}&select=*&order=label.asc` });
+    fillSites();
+  }
+
+  function fillCustomers() {
+    const sel = $("customerSelect");
+    sel.innerHTML = state.customers
+      .map((c) => `<option value="${c.id}">${escapeHtml(c.name)}</option>`)
+      .join("");
+    if (!sel.value && state.customers[0]) sel.value = state.customers[0].id;
+  }
+
+  function fillSites() {
+    const sel = $("siteSelect");
+    sel.innerHTML =
+      `<option value="">No site</option>` +
+      state.sites.map((s) => `<option value="${s.id}">${escapeHtml(s.label)}</option>`).join("");
+  }
+
+  function escapeHtml(s) {
+    return String(s ?? "")
+      .replaceAll("&", "&amp;")
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;")
+      .replaceAll('"', "&quot;");
+  }
+
+  function renderList() {
+    const term = $("search").value.trim().toLowerCase();
+    const status = $("statusFilter").value;
+    const items = state.jobs.filter((j) => {
+      const blob = `${j.number} ${j.title} ${j.summary || ""} ${j.customers?.name || ""}`.toLowerCase();
+      if (term && !blob.includes(term)) return false;
+      if (status && j.status !== status) return false;
+      return true;
+    });
+    $("jobList").innerHTML = items
+      .map(
+        (j) => `<li data-id="${j.id}">
+          <div class="num">${escapeHtml(j.number)} · ${statusLabel(j.status)}</div>
+          <strong>${escapeHtml(j.title)}</strong>
+          <div class="meta">${escapeHtml(j.customers?.name || "")}${j.sites?.label ? " · " + escapeHtml(j.sites.label) : ""}</div>
+        </li>`
+      )
+      .join("") || `<li>No jobs</li>`;
+  }
+
+  async function openJob(id) {
+    const job = await rest("GET", "jobs", {
+      query: `?id=eq.${id}&select=*,customers(name,phone),sites(label,address)`,
+    });
+    state.currentJob = job[0];
+    if (!state.currentJob) return;
+    $("jobTitle").textContent = `${state.currentJob.number} · ${state.currentJob.title}`;
+    $("jobMeta").textContent = `${statusLabel(state.currentJob.status)} · ${state.currentJob.model}`;
+    const c = state.currentJob.customers;
+    const s = state.currentJob.sites;
+    $("jobCustomer").textContent = [c?.name, c?.phone, s?.label, s?.address].filter(Boolean).join(" · ") || "—";
+    $("labourWho").value = state.profile.display_name || "";
+    $("labourDate").value = new Date().toISOString().slice(0, 10);
+    $("labourHours").value = "";
+    $("labourTask").value = "";
+    await loadLabour();
+    show("jobView");
+  }
+
+  async function loadLabour() {
+    const rows = await rest("GET", "labour_entries", {
+      query: `?job_id=eq.${state.currentJob.id}&select=*&order=work_date.desc,created_at.desc`,
+    });
+    $("labourBody").innerHTML = rows
+      .map(
+        (r) => `<tr>
+          <td>${escapeHtml(r.who)}</td>
+          <td>${escapeHtml(r.work_date)}</td>
+          <td>${hhmm(r.minutes)}</td>
+          <td>${escapeHtml(r.task || "")}</td>
+        </tr>`
+      )
+      .join("");
+    const total = rows.reduce((a, r) => a + (r.minutes || 0), 0);
+    $("labourTotal").textContent = rows.length ? `Total ${hhmm(total)}` : "No labour yet";
+  }
+
+  async function afterLogin(session) {
+    state.session = session;
+    persistSession();
+    await loadMe();
+    await loadJobs();
+    show("appView");
+  }
+
+  $("loginForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    $("loginError").hidden = true;
+    try {
+      const session = await auth("token?grant_type=password", {
+        email: $("email").value.trim(),
+        password: $("password").value,
+      });
+      await afterLogin(session);
+    } catch (err) {
+      $("loginError").textContent = err.message;
+      $("loginError").hidden = false;
+    }
+  });
+
+  $("signOut").addEventListener("click", () => {
+    state.session = null;
+    state.profile = null;
+    persistSession();
+    $("topRight").hidden = true;
+    $("brand").textContent = "Jobs";
+    show("loginView");
+  });
+
+  $("search").addEventListener("input", renderList);
+  $("statusFilter").addEventListener("change", renderList);
+
+  $("jobList").addEventListener("click", (e) => {
+    const li = e.target.closest("li[data-id]");
+    if (li) openJob(li.dataset.id);
+  });
+
+  $("backToList").addEventListener("click", async () => {
+    await loadJobs();
+    show("appView");
+  });
+
+  $("newJobBtn").addEventListener("click", async () => {
+    $("newJobError").hidden = true;
+    await loadCustomers();
+    await loadSites($("customerSelect").value);
+    show("newJobView");
+  });
+
+  $("cancelNewJob").addEventListener("click", () => show("appView"));
+
+  $("customerSelect").addEventListener("change", () => loadSites($("customerSelect").value));
+
+  $("addCustomerBtn").addEventListener("click", async () => {
+    $("newJobError").hidden = true;
+    try {
+      const name = $("newCustomerName").value.trim();
+      if (!name) throw new Error("Customer name required");
+      const created = await rest("POST", "customers", {
+        body: { name, phone: $("newCustomerPhone").value.trim() || null },
+      });
+      $("newCustomerName").value = "";
+      $("newCustomerPhone").value = "";
+      await loadCustomers();
+      $("customerSelect").value = created[0].id;
+      await loadSites(created[0].id);
+    } catch (err) {
+      $("newJobError").textContent = err.message;
+      $("newJobError").hidden = false;
+    }
+  });
+
+  $("addSiteBtn").addEventListener("click", async () => {
+    $("newJobError").hidden = true;
+    try {
+      const customerId = $("customerSelect").value;
+      if (!customerId) throw new Error("Pick a customer first");
+      const label = $("newSiteLabel").value.trim();
+      if (!label) throw new Error("Site label required");
+      const created = await rest("POST", "sites", {
+        body: {
+          customer_id: customerId,
+          label,
+          address: $("newSiteAddress").value.trim() || null,
+        },
+      });
+      $("newSiteLabel").value = "";
+      $("newSiteAddress").value = "";
+      await loadSites(customerId);
+      $("siteSelect").value = created[0].id;
+    } catch (err) {
+      $("newJobError").textContent = err.message;
+      $("newJobError").hidden = false;
+    }
+  });
+
+  $("newJobForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    $("newJobError").hidden = true;
+    try {
+      const customerId = $("customerSelect").value;
+      if (!customerId) throw new Error("Customer required");
+      const body = {
+        title: $("newTitle").value.trim(),
+        summary: $("newSummary").value.trim() || null,
+        model: $("newModel").value,
+        status: $("newStatus").value,
+        scheduled_on: $("newScheduled").value || null,
+        customer_id: customerId,
+        site_id: $("siteSelect").value || null,
+        number: "",
+      };
+      const created = await rest("POST", "jobs", { body });
+      $("newTitle").value = "";
+      $("newSummary").value = "";
+      await loadJobs();
+      await openJob(created[0].id);
+    } catch (err) {
+      $("newJobError").textContent = err.message;
+      $("newJobError").hidden = false;
+    }
+  });
+
+  $("labourForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    $("labourError").hidden = true;
+    try {
+      const minutes = minutesFromHHMM($("labourHours").value);
+      await rest("POST", "labour_entries", {
+        body: {
+          job_id: state.currentJob.id,
+          who: $("labourWho").value.trim(),
+          work_date: $("labourDate").value,
+          minutes,
+          task: $("labourTask").value.trim() || null,
+        },
+      });
+      $("labourHours").value = "";
+      $("labourTask").value = "";
+      await loadLabour();
+    } catch (err) {
+      $("labourError").textContent = err.message;
+      $("labourError").hidden = false;
+    }
+  });
+
+  async function boot() {
+    if (!window.CONFIG?.url || !window.CONFIG?.anonKey) {
+      $("loginError").textContent = "Missing config.js";
+      $("loginError").hidden = false;
+      return;
+    }
+    const raw = sessionStorage.getItem("jobs.session");
+    if (!raw) {
+      show("loginView");
+      return;
+    }
+    try {
+      state.session = JSON.parse(raw);
+      await loadMe();
+      await loadJobs();
+      show("appView");
+    } catch {
+      state.session = null;
+      persistSession();
+      show("loginView");
+    }
+  }
+
+  boot();
+  return { state, hhmm, minutesFromHHMM };
+})();
+
+  </script>
+</body>
+</html>
