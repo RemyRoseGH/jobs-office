@@ -317,6 +317,7 @@ body.field .office-only { display: none !important; }
           <button type="button" class="ghost" id="saveTemplate">Save as template</button>
         </div>
         <p class="meta" id="jobPhone"></p>
+        <p class="meta" id="jobSiteContact"></p>
         <div class="row">
           <label>Customer
             <select id="jobCustomerSelect"></select>
@@ -326,11 +327,20 @@ body.field .office-only { display: none !important; }
             <datalist id="jobSiteOptions"></datalist>
           </label>
         </div>
+        <div class="row">
+          <label>Site contact
+            <input id="jobSiteContactName" placeholder="Name on site" />
+          </label>
+          <label>Site phone
+            <input id="jobSiteContactPhone" placeholder="Phone on site" />
+          </label>
+        </div>
         <label>Site notes
           <input id="jobSiteNotes" placeholder="Gate, dog, meter, access" />
         </label>
+        <button type="button" class="ghost" id="copyCustomerContact">Same as customer</button>
         <button type="button" class="ghost" id="saveSite">Save site</button>
-        <p class="hint">Site is the address. Change it here and every job on that site updates. Duplicate copies customer, site, tasks, materials and equipment. Not hours, notes, crew or pack.</p>
+        <p class="hint">Customer is who you bill. Site is where you work. Duplicate copies customer, site, tasks, materials and equipment. Not hours, notes, crew or pack.</p>
         <p class="error" id="jobError" hidden></p>
       </div>
       <div class="card" id="crewCard">
@@ -371,6 +381,7 @@ body.field .office-only { display: none !important; }
         <h2>Job summary</h2>
         <p class="hint">For invoicing. Everything on this job, all tasks.</p>
         <p class="meta" id="summaryHours"></p>
+        <p class="meta office-only" id="jobMoney"></p>
         <table>
           <thead><tr><th>Task</th><th>Who</th><th>Hours</th></tr></thead>
           <tbody id="summaryLabourBody"></tbody>
@@ -492,6 +503,13 @@ body.field .office-only { display: none !important; }
           <label>Site notes
             <input id="newSiteNotes" placeholder="Gate, dog, meter, access" />
           </label>
+          <label>Site contact
+            <input id="newSiteContactName" placeholder="Name on site" />
+          </label>
+          <label>Site phone
+            <input id="newSiteContactPhone" placeholder="Phone on site" />
+          </label>
+          <button type="button" class="ghost" id="newCopyCustomer">Same as customer</button>
           <label>Template
             <select id="jobTemplate"><option value="">None</option></select>
           </label>
@@ -524,15 +542,17 @@ body.field .office-only { display: none !important; }
     <section id="customersTab" hidden>
       <div class="card">
         <h1>Customers</h1>
-        <form id="customerForm" class="inline">
+        <form id="customerForm" class="stack">
           <input id="custName" placeholder="Name" required />
-          <input id="custPhone" placeholder="Phone" />
+          <input id="custCompany" placeholder="Company" />
+          <input id="custPostal" placeholder="Postal address" />
           <input id="custEmail" placeholder="Email" />
+          <input id="custPhone" placeholder="Phone" />
           <button type="submit">Add customer</button>
         </form>
         <p class="error" id="custError" hidden></p>
         <table>
-          <thead><tr><th>Name</th><th>Phone</th><th>Email</th></tr></thead>
+          <thead><tr><th>Name</th><th>Company</th><th>Phone</th><th>Email</th></tr></thead>
           <tbody id="custBody"></tbody>
         </table>
       </div>
@@ -543,15 +563,27 @@ body.field .office-only { display: none !important; }
       <div class="card">
         <h1 id="custTitle"></h1>
         <p class="meta" id="custMeta"></p>
+        <form id="custBillingForm" class="stack">
+          <label>Name<input id="custEditName" required /></label>
+          <label>Company<input id="custEditCompany" /></label>
+          <label>Postal address<input id="custEditPostal" /></label>
+          <label>Email<input id="custEditEmail" /></label>
+          <label>Phone<input id="custEditPhone" /></label>
+          <button type="submit">Save customer</button>
+        </form>
+        <p class="error" id="custEditError" hidden></p>
         <h2>Sites</h2>
         <form id="custSiteForm" class="stack">
           <input id="custSiteAddress" placeholder="Street, suburb" required />
           <input id="custSiteNotes" placeholder="Gate, dog, meter, access" />
+          <input id="custSiteContactName" placeholder="Site contact" />
+          <input id="custSiteContactPhone" placeholder="Site phone" />
+          <button type="button" class="ghost" id="custCopyCustomer">Same as customer</button>
           <button type="submit">Add or save address</button>
         </form>
         <p class="error" id="custSiteError" hidden></p>
         <table>
-          <thead><tr><th>Address</th><th>Notes</th></tr></thead>
+          <thead><tr><th>Address</th><th>Contact</th><th>Notes</th></tr></thead>
           <tbody id="custSiteBody"></tbody>
         </table>
         <h2>Jobs</h2>
@@ -579,22 +611,57 @@ body.field .office-only { display: none !important; }
             <option value="trade">Trade</option>
             <option value="apprentice">Apprentice</option>
             <option value="supervisor">Supervisor</option>
+            <option value="project_manager">Project manager</option>
+            <option value="subcontractor">Subby</option>
           </select>
+          <input id="empPhone" placeholder="Phone" />
           <button type="submit">Add employee</button>
         </form>
         <p class="error" id="empError" hidden></p>
+        <p class="hint office-only">Charge rate comes from Rates. Click a person for their card.</p>
+        <button type="button" class="ghost office-only" id="openRates">Rates</button>
         <table>
-          <thead><tr><th>Name</th><th>Classification</th><th class="office-only">Cost $/h</th><th class="office-only">Charge $/h</th></tr></thead>
+          <thead><tr><th>Name</th><th>Role</th><th>Phone</th><th class="office-only">Charge $/h</th></tr></thead>
           <tbody id="empBody"></tbody>
         </table>
       </div>
-      <div class="card office-only" id="chargeCard">
-        <h2>Charge-out</h2>
-        <p class="hint">charge = (person cost + overhead) / (1 − profit). Field never sees this.</p>
-        <div class="row">
-          <label>Overhead $/h<input id="overhead" inputmode="decimal" placeholder="0.00" /></label>
-          <label>Profit %<input id="profitPct" inputmode="decimal" placeholder="20" /></label>
-        </div>
+    </section>
+
+    <section id="employeeView" hidden>
+      <button type="button" class="link" id="backToEmployees">← Employees</button>
+      <div class="card narrow">
+        <h1 id="empCardTitle"></h1>
+        <form id="empCardForm" class="stack">
+          <label>Name<input id="empCardName" required /></label>
+          <label>Role
+            <select id="empCardClass">
+              <option value="trade">Trade</option>
+              <option value="apprentice">Apprentice</option>
+              <option value="supervisor">Supervisor</option>
+              <option value="project_manager">Project manager</option>
+              <option value="subcontractor">Subby</option>
+            </select>
+          </label>
+          <label>Phone<input id="empCardPhone" /></label>
+          <label class="office-only">Cost override $/h
+            <input id="empCardCost" inputmode="decimal" placeholder="Leave blank for role default" />
+          </label>
+          <p class="meta office-only" id="empCardRate"></p>
+          <button type="submit">Save</button>
+        </form>
+        <p class="error" id="empCardError" hidden></p>
+      </div>
+    </section>
+
+    <section id="ratesView" hidden>
+      <button type="button" class="link" id="backToEmployeesFromRates">← Employees</button>
+      <div class="card">
+        <h1>Rates</h1>
+        <p class="hint">Per role. charge = (cost + overhead) / (1 − profit). Writes charge onto people with that role. A person cost override only recalculates that person. Field never sees this.</p>
+        <table>
+          <thead><tr><th>Role</th><th>Cost $/h</th><th>Overhead $/h</th><th>Profit %</th><th>Charge $/h</th></tr></thead>
+          <tbody id="ratesBody"></tbody>
+        </table>
         <button type="button" id="writeRates">Write charge rates</button>
         <p class="meta" id="chargePreview"></p>
         <p class="error" id="chargeError" hidden></p>
@@ -792,10 +859,15 @@ const JOBS = (() => {
   }
 
   function classLabel(s) {
-    return ({ trade: "Trade", apprentice: "Apprentice", supervisor: "Supervisor" })[s] || s;
+    return ({
+      trade: "Trade", apprentice: "Apprentice", supervisor: "Supervisor",
+      project_manager: "Project manager", subcontractor: "Subby",
+    })[s] || s;
   }
 
-  const views = ["loginView", "jobsTab", "jobView", "taskView", "newJobView", "customersTab", "customerView", "employeesTab", "catalogueTab"];
+  const ROLE_ORDER = ["trade", "apprentice", "supervisor", "project_manager", "subcontractor"];
+
+  const views = ["loginView", "jobsTab", "jobView", "taskView", "newJobView", "customersTab", "customerView", "employeesTab", "employeeView", "ratesView", "catalogueTab"];
   function show(id) {
     views.forEach((v) => { const el = $(v); if (el) el.hidden = v !== id; });
   }
@@ -859,7 +931,7 @@ const JOBS = (() => {
   }
 
   async function loadJobs() {
-    state.jobs = await rest("GET", "jobs", { query: "?select=*,customers(name,phone),sites(label,address,notes)&order=created_at.desc" });
+    state.jobs = await rest("GET", "jobs", { query: "?select=*,customers(name,phone,company),sites(label,address,notes,contact_name,contact_phone)&order=created_at.desc" });
     await loadHours();
     renderJobs();
   }
@@ -868,7 +940,7 @@ const JOBS = (() => {
     state.customers = await rest("GET", "customers", { query: "?select=*&order=name.asc" });
     $("customerOptions").innerHTML = state.customers.map((c) => `<option value="${escapeHtml(c.name)}"></option>`).join("");
     $("custBody").innerHTML = state.customers.map((c) =>
-      `<tr data-id="${c.id}"><td>${escapeHtml(c.name)}</td><td>${escapeHtml(c.phone || "")}</td><td>${escapeHtml(c.email || "")}</td></tr>`
+      `<tr data-id="${c.id}"><td>${escapeHtml(c.name)}</td><td>${escapeHtml(c.company || "")}</td><td>${escapeHtml(c.phone || "")}</td><td>${escapeHtml(c.email || "")}</td></tr>`
     ).join("");
   }
 
@@ -876,6 +948,7 @@ const JOBS = (() => {
     state.employees = await rest("GET", "employees", { query: "?select=*&order=name.asc" });
     state.employeeCosts = {};
     state.chargeRates = {};
+    state.classRates = {};
     if (isOffice()) {
       const costs = await rest("GET", "employee_costs", { query: "?select=*" });
       state.employeeCosts = Object.fromEntries(costs.map((r) => [r.employee_id, r.cost_cents_per_hour]));
@@ -883,20 +956,33 @@ const JOBS = (() => {
       for (const r of rates) {
         if (r.employee_id) state.chargeRates[r.employee_id] = r.charge_cents_per_hour;
       }
-      const settings = await rest("GET", "charge_settings", { query: `?operator_id=eq.${state.profile.operator_id}&select=*` });
-      if (settings[0]) {
-        $("overhead").value = dollars(settings[0].overhead_cents_per_hour);
-        $("profitPct").value = String((settings[0].profit_bps || 0) / 100);
-      }
+      const classRows = await rest("GET", "classification_rates", { query: "?select=*" });
+      state.classRates = Object.fromEntries(classRows.map((r) => [r.classification, r]));
     }
     $("empBody").innerHTML = state.employees.map((e) =>
       `<tr data-emp="${e.id}"><td>${escapeHtml(e.name)}</td><td>${classLabel(e.classification)}</td>
-       <td class="office-only"><input data-cost="${e.id}" inputmode="decimal" value="${dollars(state.employeeCosts[e.id])}" /></td>
+       <td>${escapeHtml(e.phone || "")}</td>
        <td class="office-only">${dollars(state.chargeRates[e.id])}</td></tr>`
     ).join("");
     $("employeeChecks").innerHTML = state.employees.filter((e) => e.active !== false).map((e) =>
       `<label><input type="checkbox" name="emp" value="${e.id}" /> ${escapeHtml(e.name)} <span class="meta">${classLabel(e.classification)}</span></label>`
     ).join("") || `<p class="meta">Add employees first.</p>`;
+  }
+
+  function personCostCents(emp) {
+    if (!emp) return 0;
+    if (state.employeeCosts[emp.id] != null) return state.employeeCosts[emp.id];
+    return state.classRates[emp.classification]?.cost_cents_per_hour || 0;
+  }
+
+  function personChargeCents(emp) {
+    if (!emp) return 0;
+    if (state.chargeRates[emp.id] != null) return state.chargeRates[emp.id];
+    return state.classRates[emp.classification]?.charge_cents_per_hour || 0;
+  }
+
+  function centsFromMinutes(centsPerHour, minutes) {
+    return Math.round((Number(centsPerHour) || 0) * (Number(minutes) || 0) / 60);
   }
 
   async function loadCatalogue() {
@@ -1236,41 +1322,56 @@ const JOBS = (() => {
     const current = sites.find((s) => s.id === state.currentJob.site_id);
     $("jobSiteAddress").value = current?.address || current?.label || "";
     $("jobSiteNotes").value = current?.notes || "";
+    $("jobSiteContactName").value = current?.contact_name || "";
+    $("jobSiteContactPhone").value = current?.contact_phone || "";
+    const sc = [current?.contact_name, current?.contact_phone].filter(Boolean).join(" · ");
+    $("jobSiteContact").textContent = sc ? `Site ${sc}` : "";
+  }
+
+  function sitePayload() {
+    return {
+      notes: $("jobSiteNotes").value.trim() || null,
+      contact_name: $("jobSiteContactName").value.trim() || null,
+      contact_phone: $("jobSiteContactPhone").value.trim() || null,
+    };
   }
 
   async function saveJobSite() {
     const customer_id = $("jobCustomerSelect").value;
     const address = $("jobSiteAddress").value.trim();
-    const notes = $("jobSiteNotes").value.trim() || null;
+    const extra = sitePayload();
     if (!address) {
       await patchJob({ site_id: null });
       return;
     }
     const sites = await loadCustomerSites(customer_id);
     const match = sites.find((s) => (s.address || s.label || "").toLowerCase() === address.toLowerCase());
+    const body = { address, label: address, ...extra };
     if (match) {
-      await rest("PATCH", "sites", { query: `?id=eq.${match.id}`, body: { address, notes } });
+      await rest("PATCH", "sites", { query: `?id=eq.${match.id}`, body });
       await patchJob({ site_id: match.id });
     } else if (state.currentJob.site_id) {
-      await rest("PATCH", "sites", { query: `?id=eq.${state.currentJob.site_id}`, body: { address, notes } });
+      await rest("PATCH", "sites", { query: `?id=eq.${state.currentJob.site_id}`, body });
     } else {
-      const created = await rest("POST", "sites", { body: { customer_id, address, label: address, notes } });
+      const created = await rest("POST", "sites", { body: { customer_id, ...body } });
       await patchJob({ site_id: created[0].id });
     }
     await fillJobPlaces();
     await loadJobs();
   }
 
-  async function ensureSite(customerId, address, notes) {
+  async function ensureSite(customerId, address, extra) {
     const addr = (address || "").trim();
     if (!addr) return null;
+    const fields = (extra && typeof extra === "object") ? extra : { notes: extra || null };
     const sites = await loadCustomerSites(customerId);
     const match = sites.find((s) => (s.address || s.label || "").toLowerCase() === addr.toLowerCase());
+    const body = { address: addr, label: addr, ...fields };
     if (match) {
-      if (notes != null) await rest("PATCH", "sites", { query: `?id=eq.${match.id}`, body: { notes: notes || null, address: addr } });
+      await rest("PATCH", "sites", { query: `?id=eq.${match.id}`, body });
       return match.id;
     }
-    const created = await rest("POST", "sites", { body: { customer_id: customerId, address: addr, label: addr, notes: notes || null } });
+    const created = await rest("POST", "sites", { body: { customer_id: customerId, ...body } });
     return created[0].id;
   }
 
@@ -1405,8 +1506,40 @@ const JOBS = (() => {
     return Math.round((d + o) * 10000 / (10000 - p));
   }
 
+  async function openEmployee(id) {
+    if (!state.employees.length) await loadEmployees();
+    const e = state.employees.find((x) => x.id === id);
+    if (!e) return;
+    state.currentEmployee = e;
+    $("empCardTitle").textContent = e.name;
+    $("empCardName").value = e.name;
+    $("empCardClass").value = e.classification;
+    $("empCardPhone").value = e.phone || "";
+    $("empCardCost").value = state.employeeCosts[e.id] != null ? dollars(state.employeeCosts[e.id]) : "";
+    $("empCardRate").textContent = `Charge $${dollars(personChargeCents(e))}/h`;
+    $("empCardError").hidden = true;
+    show("employeeView");
+    setTab("employees");
+  }
+
+  function renderRates() {
+    $("ratesBody").innerHTML = ROLE_ORDER.map((role) => {
+      const r = state.classRates[role] || {};
+      const charge = (r.cost_cents_per_hour != null)
+        ? chargeCents(r.cost_cents_per_hour, r.overhead_cents_per_hour, r.profit_bps)
+        : 0;
+      return `<tr data-role="${role}">
+        <td>${classLabel(role)}</td>
+        <td><input data-field="cost" inputmode="decimal" value="${dollars(r.cost_cents_per_hour)}" /></td>
+        <td><input data-field="overhead" inputmode="decimal" value="${dollars(r.overhead_cents_per_hour)}" /></td>
+        <td><input data-field="profit" inputmode="decimal" value="${r.profit_bps != null ? String(r.profit_bps / 100) : ""}" /></td>
+        <td>${dollars(r.charge_cents_per_hour || charge)}</td>
+      </tr>`;
+    }).join("");
+  }
+
   async function openJob(id) {
-    const job = await rest("GET", "jobs", { query: `?id=eq.${id}&select=*,customers(name,phone),sites(label,address,notes)` });
+    const job = await rest("GET", "jobs", { query: `?id=eq.${id}&select=*,customers(name,phone,company),sites(label,address,notes,contact_name,contact_phone)` });
     state.currentJob = job[0];
     if (!state.currentJob) return;
     $("jobTitle").textContent = `${state.currentJob.number} · ${state.currentJob.title}`;
@@ -1417,12 +1550,14 @@ const JOBS = (() => {
     $("jobModel").value = state.currentJob.model || "tm";
     $("jobQuoted").value = state.currentJob.quoted_amount_cents != null ? dollars(state.currentJob.quoted_amount_cents) : "";
     const phone = state.currentJob.customers?.phone;
-    $("jobPhone").textContent = phone ? `Phone ${phone}` : "";
+    const company = state.currentJob.customers?.company;
+    $("jobPhone").textContent = [company, phone ? `Phone ${phone}` : ""].filter(Boolean).join(" · ");
     $("jobError").hidden = true;
     await fillJobPlaces();
     await loadCrew();
     await loadPack();
     await loadTasks();
+    if (isOffice() && !Object.keys(state.classRates || {}).length) await loadEmployees();
     await loadJobSummary();
     show("jobView");
     setTab("jobs");
@@ -1430,11 +1565,17 @@ const JOBS = (() => {
 
   async function openCustomer(id) {
     if (!state.jobs.length) await loadJobs();
+    await loadCustomers();
     const c = state.customers.find((x) => x.id === id);
     if (!c) return;
     state.currentCustomer = c;
     $("custTitle").textContent = c.name;
-    $("custMeta").textContent = [c.phone, c.email].filter(Boolean).join(" · ") || "";
+    $("custMeta").textContent = [c.company, c.postal_address].filter(Boolean).join(" · ");
+    $("custEditName").value = c.name || "";
+    $("custEditCompany").value = c.company || "";
+    $("custEditPostal").value = c.postal_address || "";
+    $("custEditEmail").value = c.email || "";
+    $("custEditPhone").value = c.phone || "";
     const jobs = sortJobs(state.jobs.filter((j) => j.customer_id === id));
     $("custJobBody").innerHTML = jobs.map((j) => `<tr data-id="${j.id}">
       <td class="num">${escapeHtml(j.number)}</td>
@@ -1445,10 +1586,12 @@ const JOBS = (() => {
     </tr>`).join("") || `<tr><td colspan="5">No jobs</td></tr>`;
     const sites = await loadCustomerSites(id);
     $("custSiteBody").innerHTML = sites.map((s) =>
-      `<tr data-site="${s.id}"><td>${escapeHtml(s.address || s.label)}</td><td>${escapeHtml(s.notes || "")}</td></tr>`
-    ).join("") || `<tr><td colspan="2">No addresses</td></tr>`;
+      `<tr data-site="${s.id}"><td>${escapeHtml(s.address || s.label)}</td><td>${escapeHtml([s.contact_name, s.contact_phone].filter(Boolean).join(" · "))}</td><td>${escapeHtml(s.notes || "")}</td></tr>`
+    ).join("") || `<tr><td colspan="3">No addresses</td></tr>`;
     $("custSiteAddress").value = "";
     $("custSiteNotes").value = "";
+    $("custSiteContactName").value = "";
+    $("custSiteContactPhone").value = "";
     show("customerView");
     setTab("customers");
   }
@@ -1531,6 +1674,29 @@ const JOBS = (() => {
       </tr>`;
     }).join("") || `<tr><td colspan="5">No equipment</td></tr>`;
     $("summaryEquipmentTotal").textContent = eqs.length && isOffice() ? `Equipment ${dollars(eqSum)}` : "";
+
+    if (isOffice()) {
+      if (!state.employees.length) await loadEmployees();
+      let labourCost = 0;
+      let labourCharge = 0;
+      for (const r of labour) {
+        const emp = state.employees.find((e) => e.id === r.employee_id);
+        labourCost += centsFromMinutes(personCostCents(emp), r.minutes);
+        labourCharge += centsFromMinutes(personChargeCents(emp), r.minutes);
+      }
+      const vars = await rest("GET", "job_variations", { query: `?job_id=eq.${jid}&status=eq.accepted&select=id` });
+      let varSell = 0;
+      if (vars.length) {
+        const amounts = await rest("GET", "job_variation_amounts", { query: `?variation_id=in.(${vars.map((v) => v.id).join(",")})&select=amount_cents` });
+        varSell = amounts.reduce((a, r) => a + (r.amount_cents || 0), 0);
+      }
+      const cost = labourCost + matSum + eqSum;
+      const quoted = state.currentJob.quoted_amount_cents;
+      const sell = (state.currentJob.model === "quoted" && quoted != null ? quoted : labourCharge) + varSell;
+      const result = sell - cost;
+      const margin = sell ? Math.round((result * 10000) / sell) / 100 : null;
+      $("jobMoney").textContent = `Job money · Cost $${dollars(cost)} · Sell $${dollars(sell)} · Result $${dollars(result)}${margin == null ? "" : ` · ${margin}%`}`;
+    } else if ($("jobMoney")) $("jobMoney").textContent = "";
   }
 
   async function openTask(id) {
@@ -1996,7 +2162,11 @@ const JOBS = (() => {
     e.preventDefault();
     $("custSiteError").hidden = true;
     try {
-      await ensureSite(state.currentCustomer.id, $("custSiteAddress").value, $("custSiteNotes").value);
+      await ensureSite(state.currentCustomer.id, $("custSiteAddress").value, {
+        notes: $("custSiteNotes").value.trim() || null,
+        contact_name: $("custSiteContactName").value.trim() || null,
+        contact_phone: $("custSiteContactPhone").value.trim() || null,
+      });
       await openCustomer(state.currentCustomer.id);
     } catch (err) {
       $("custSiteError").textContent = err.message;
@@ -2006,56 +2176,50 @@ const JOBS = (() => {
   $("custSiteBody").addEventListener("click", (e) => {
     const row = e.target.closest("tr[data-site]");
     if (!row) return;
-    const addr = row.children[0].textContent;
-    const notes = row.children[1].textContent;
-    $("custSiteAddress").value = addr;
-    $("custSiteNotes").value = notes;
+    $("custSiteAddress").value = row.children[0].textContent;
+    const contact = row.children[1].textContent.split(" · ");
+    $("custSiteContactName").value = contact[0] || "";
+    $("custSiteContactPhone").value = contact[1] || "";
+    $("custSiteNotes").value = row.children[2].textContent;
   });
-  $("empBody").addEventListener("change", async (e) => {
-    const input = e.target.closest("input[data-cost]");
-    if (!input || !isOffice()) return;
-    $("empError").hidden = true;
-    try {
-      const cents = input.value ? toCents(input.value) : 0;
-      const existing = state.employeeCosts[input.dataset.cost];
-      if (existing != null) {
-        await rest("PATCH", "employee_costs", { query: `?employee_id=eq.${input.dataset.cost}`, body: { cost_cents_per_hour: cents } });
-      } else {
-        await rest("POST", "employee_costs", { body: { employee_id: input.dataset.cost, cost_cents_per_hour: cents } });
-      }
-      state.employeeCosts[input.dataset.cost] = cents;
-    } catch (err) {
-      $("empError").textContent = err.message;
-      $("empError").hidden = false;
-    }
+  $("empBody").addEventListener("click", (e) => {
+    const row = e.target.closest("tr[data-emp]");
+    if (row) openEmployee(row.dataset.emp);
   });
   $("writeRates").addEventListener("click", async () => {
     $("chargeError").hidden = true;
     try {
-      const overhead = $("overhead").value ? toCents($("overhead").value) : 0;
-      const pct = Number($("profitPct").value || "0");
-      const profit_bps = Math.round(pct * 100);
-      const existing = await rest("GET", "charge_settings", { query: `?operator_id=eq.${state.profile.operator_id}&select=*` });
-      if (existing.length) {
-        await rest("PATCH", "charge_settings", { query: `?operator_id=eq.${state.profile.operator_id}`, body: { overhead_cents_per_hour: overhead, profit_bps } });
-      } else {
-        await rest("POST", "charge_settings", { body: { operator_id: state.profile.operator_id, overhead_cents_per_hour: overhead, profit_bps } });
-      }
       const preview = [];
-      for (const e of state.employees) {
-        const direct = state.employeeCosts[e.id];
-        if (direct == null) continue;
-        const charge = chargeCents(direct, overhead, profit_bps);
-        const old = await rest("GET", "rate_book", { query: `?employee_id=eq.${e.id}&select=id` });
-        if (old.length) {
-          await rest("PATCH", "rate_book", { query: `?id=eq.${old[0].id}`, body: { name: e.name, charge_cents_per_hour: charge } });
+      for (const row of document.querySelectorAll("#ratesBody tr[data-role]")) {
+        const role = row.dataset.role;
+        const cost = row.querySelector("[data-field=cost]").value ? toCents(row.querySelector("[data-field=cost]").value) : 0;
+        const overhead = row.querySelector("[data-field=overhead]").value ? toCents(row.querySelector("[data-field=overhead]").value) : 0;
+        const pct = Number(row.querySelector("[data-field=profit]").value || "0");
+        const profit_bps = Math.round(pct * 100);
+        const charge = chargeCents(cost, overhead, profit_bps);
+        const existing = state.classRates[role];
+        const body = { cost_cents_per_hour: cost, overhead_cents_per_hour: overhead, profit_bps, charge_cents_per_hour: charge };
+        if (existing) {
+          await rest("PATCH", "classification_rates", { query: `?operator_id=eq.${state.profile.operator_id}&classification=eq.${role}`, body });
         } else {
-          await rest("POST", "rate_book", { body: { name: e.name, employee_id: e.id, charge_cents_per_hour: charge } });
+          await rest("POST", "classification_rates", { body: { operator_id: state.profile.operator_id, classification: role, ...body } });
         }
-        preview.push(`${e.name} ${dollars(charge)}/h`);
+        state.classRates[role] = { classification: role, ...body };
+        for (const e of state.employees.filter((x) => x.classification === role)) {
+          const direct = state.employeeCosts[e.id] != null ? state.employeeCosts[e.id] : cost;
+          const personCharge = chargeCents(direct, overhead, profit_bps);
+          const old = await rest("GET", "rate_book", { query: `?employee_id=eq.${e.id}&select=id` });
+          if (old.length) {
+            await rest("PATCH", "rate_book", { query: `?id=eq.${old[0].id}`, body: { name: e.name, charge_cents_per_hour: personCharge } });
+          } else {
+            await rest("POST", "rate_book", { body: { name: e.name, employee_id: e.id, charge_cents_per_hour: personCharge } });
+          }
+          preview.push(`${e.name} ${dollars(personCharge)}/h`);
+        }
       }
-      $("chargePreview").textContent = preview.join(" · ") || "Add person cost first.";
+      $("chargePreview").textContent = preview.join(" · ") || "Rates saved. Add people to write their charge.";
       await loadEmployees();
+      renderRates();
     } catch (err) {
       $("chargeError").textContent = err.message;
       $("chargeError").hidden = false;
@@ -2063,6 +2227,87 @@ const JOBS = (() => {
   });
   $("labourStart").addEventListener("change", updateLabourPreview);
   $("labourFinish").addEventListener("change", updateLabourPreview);
+  $("openRates").addEventListener("click", async () => {
+    if (!isOffice()) return;
+    await loadEmployees();
+    renderRates();
+    show("ratesView");
+    setTab("employees");
+  });
+  $("backToEmployees").addEventListener("click", async () => { await loadEmployees(); show("employeesTab"); });
+  $("backToEmployeesFromRates").addEventListener("click", async () => { await loadEmployees(); show("employeesTab"); });
+  $("empCardForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    $("empCardError").hidden = true;
+    try {
+      const id = state.currentEmployee.id;
+      await rest("PATCH", "employees", { query: `?id=eq.${id}`, body: {
+        name: $("empCardName").value.trim(),
+        classification: $("empCardClass").value,
+        phone: $("empCardPhone").value.trim() || null,
+      }});
+      const override = $("empCardCost").value.trim();
+      if (override) {
+        const cents = toCents(override);
+        if (state.employeeCosts[id] != null) {
+          await rest("PATCH", "employee_costs", { query: `?employee_id=eq.${id}`, body: { cost_cents_per_hour: cents } });
+        } else {
+          await rest("POST", "employee_costs", { body: { employee_id: id, cost_cents_per_hour: cents } });
+        }
+        state.employeeCosts[id] = cents;
+      } else if (state.employeeCosts[id] != null) {
+        await rest("DELETE", "employee_costs", { query: `?employee_id=eq.${id}` });
+        delete state.employeeCosts[id];
+      }
+      const emp = { ...state.currentEmployee, name: $("empCardName").value.trim(), classification: $("empCardClass").value };
+      const role = state.classRates[emp.classification] || {};
+      const direct = personCostCents(emp);
+      const charge = chargeCents(direct, role.overhead_cents_per_hour || 0, role.profit_bps || 0);
+      const old = await rest("GET", "rate_book", { query: `?employee_id=eq.${id}&select=id` });
+      if (old.length) await rest("PATCH", "rate_book", { query: `?id=eq.${old[0].id}`, body: { name: emp.name, charge_cents_per_hour: charge } });
+      else if (isOffice()) await rest("POST", "rate_book", { body: { name: emp.name, employee_id: id, charge_cents_per_hour: charge } });
+      await loadEmployees();
+      await openEmployee(id);
+    } catch (err) {
+      $("empCardError").textContent = err.message;
+      $("empCardError").hidden = false;
+    }
+  });
+  $("custBillingForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    $("custEditError").hidden = true;
+    try {
+      await rest("PATCH", "customers", { query: `?id=eq.${state.currentCustomer.id}`, body: {
+        name: $("custEditName").value.trim(),
+        company: $("custEditCompany").value.trim() || null,
+        postal_address: $("custEditPostal").value.trim() || null,
+        email: $("custEditEmail").value.trim() || null,
+        phone: $("custEditPhone").value.trim() || null,
+      }});
+      await openCustomer(state.currentCustomer.id);
+    } catch (err) {
+      $("custEditError").textContent = err.message;
+      $("custEditError").hidden = false;
+    }
+  });
+  $("copyCustomerContact").addEventListener("click", () => {
+    const c = state.customers.find((x) => x.id === $("jobCustomerSelect").value);
+    if (!c) return;
+    $("jobSiteContactName").value = c.name || "";
+    $("jobSiteContactPhone").value = c.phone || "";
+  });
+  $("newCopyCustomer").addEventListener("click", () => {
+    const c = findCustomerByName($("customerTypeahead").value);
+    if (!c) return;
+    $("newSiteContactName").value = c.name || "";
+    $("newSiteContactPhone").value = c.phone || "";
+  });
+  $("custCopyCustomer").addEventListener("click", () => {
+    const c = state.currentCustomer;
+    if (!c) return;
+    $("custSiteContactName").value = c.name || "";
+    $("custSiteContactPhone").value = c.phone || "";
+  });
 
   $("newJobBtn").addEventListener("click", async () => {
     $("newJobError").hidden = true;
@@ -2090,7 +2335,11 @@ const JOBS = (() => {
       const status = $("newStatus").value;
       const scheduled_on = $("newScheduled").value || null;
       if (status === "scheduled" && !scheduled_on) throw new Error("Set a scheduled date first");
-      const site_id = await ensureSite(customer.id, $("newSiteAddress").value, $("newSiteNotes").value);
+      const site_id = await ensureSite(customer.id, $("newSiteAddress").value, {
+        notes: $("newSiteNotes").value.trim() || null,
+        contact_name: $("newSiteContactName").value.trim() || null,
+        contact_phone: $("newSiteContactPhone").value.trim() || null,
+      });
       let quoted = null;
       if (isOffice() && $("newQuoted").value) quoted = toCents($("newQuoted").value);
       const created = await rest("POST", "jobs", { body: {
@@ -2230,10 +2479,12 @@ const JOBS = (() => {
     try {
       await rest("POST", "customers", { body: {
         name: $("custName").value.trim(),
+        company: $("custCompany").value.trim() || null,
+        postal_address: $("custPostal").value.trim() || null,
         phone: $("custPhone").value.trim() || null,
         email: $("custEmail").value.trim() || null,
       }});
-      $("custName").value = ""; $("custPhone").value = ""; $("custEmail").value = "";
+      $("custName").value = ""; $("custCompany").value = ""; $("custPostal").value = ""; $("custPhone").value = ""; $("custEmail").value = "";
       await loadCustomers();
     } catch (err) {
       $("custError").textContent = err.message;
@@ -2248,8 +2499,9 @@ const JOBS = (() => {
       await rest("POST", "employees", { body: {
         name: $("empName").value.trim(),
         classification: $("empClass").value,
+        phone: $("empPhone").value.trim() || null,
       }});
-      $("empName").value = "";
+      $("empName").value = ""; $("empPhone").value = "";
       await loadEmployees();
     } catch (err) {
       $("empError").textContent = err.message;
