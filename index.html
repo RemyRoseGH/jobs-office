@@ -194,6 +194,14 @@ body.field .office-only { display: none !important; }
 .people-week td.clash { color: var(--danger); }
 #weekBar { align-items: center; }
 #weekBar strong { min-width: 180px; }
+.photos { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0; }
+.photos img { width: 120px; height: 120px; object-fit: cover; border-radius: 8px; border: 1px solid var(--line); }
+#printRun { display: none; }
+@media print {
+  header, nav, .toolbar, .chips, #loginView, #jobsListPane, #weekView, #weekBar, #invoiceView, #jobView, #taskView, #newJobView, #customersTab, #customerView, #employeesTab, #catalogueTab, #listError, #quickFilters { display: none !important; }
+  #printRun { display: block !important; }
+  main { max-width: none; margin: 0; }
+}
 
 </style>
 </head>
@@ -239,6 +247,7 @@ body.field .office-only { display: none !important; }
         <button type="button" id="newJobBtn">New job</button>
         <button type="button" class="ghost on" id="listViewBtn">List</button>
         <button type="button" class="ghost" id="weekViewBtn">Week</button>
+        <button type="button" class="ghost" id="invoiceViewBtn">To invoice</button>
       </div>
       <div class="chips" id="quickFilters">
         <button type="button" data-quick="" class="on">All</button>
@@ -251,8 +260,11 @@ body.field .office-only { display: none !important; }
         <strong id="weekLabel"></strong>
         <button type="button" class="ghost" id="weekToday">This week</button>
         <button type="button" class="ghost" id="weekNext">Next</button>
+        <button type="button" class="ghost" id="printToday">Print today</button>
       </div>
       <div id="weekView" hidden></div>
+      <div id="invoiceView" hidden></div>
+      <div id="printRun" hidden></div>
       <div id="listError" class="error" hidden></div>
       <div class="jobs-scroll" id="jobsListPane">
         <table class="jobs-table">
@@ -291,24 +303,64 @@ body.field .office-only { display: none !important; }
           <label>Scheduled
             <input id="jobScheduled" type="date" />
           </label>
+          <label>Type
+            <select id="jobModel">
+              <option value="tm">TM</option>
+              <option value="quoted">Quoted</option>
+              <option value="measured">Measured</option>
+            </select>
+          </label>
+          <label class="office-only">Quoted $
+            <input id="jobQuoted" inputmode="decimal" placeholder="0.00" />
+          </label>
           <button type="button" class="ghost" id="duplicateJob">Duplicate job</button>
+          <button type="button" class="ghost" id="saveTemplate">Save as template</button>
         </div>
+        <p class="meta" id="jobPhone"></p>
         <div class="row">
           <label>Customer
             <select id="jobCustomerSelect"></select>
           </label>
-          <label>Site
-            <select id="jobSiteSelect"><option value="">No site</option></select>
+          <label>Site address
+            <input id="jobSiteAddress" list="jobSiteOptions" autocomplete="off" placeholder="Street, suburb" />
+            <datalist id="jobSiteOptions"></datalist>
           </label>
         </div>
-        <p class="hint">Duplicate copies customer, site, tasks, materials and equipment. Not hours or notes.</p>
+        <label>Site notes
+          <input id="jobSiteNotes" placeholder="Gate, dog, meter, access" />
+        </label>
+        <button type="button" class="ghost" id="saveSite">Save site</button>
+        <p class="hint">Site is the address. Change it here and every job on that site updates. Duplicate copies customer, site, tasks, materials and equipment. Not hours, notes, crew or pack.</p>
         <p class="error" id="jobError" hidden></p>
       </div>
       <div class="card" id="crewCard">
         <h2>Crew</h2>
-        <p class="hint">Who is allocated on the scheduled date. Hours still go on the task.</p>
+        <p class="hint">Who is allocated on a date. Hours still go on the task. Change the date to put people on another day.</p>
+        <label>Date<input id="crewDate" type="date" /></label>
         <div id="crewChecks" class="checks"></div>
+        <p class="meta" id="crewDays"></p>
         <p class="error" id="crewError" hidden></p>
+      </div>
+      <div class="card" id="packCard">
+        <h2>Invoice pack</h2>
+        <p class="meta" id="packStatus"></p>
+        <h2>Completion checks</h2>
+        <div id="checkList" class="checks"></div>
+        <h2>Photos</h2>
+        <input id="photoFile" type="file" accept="image/*" />
+        <div id="photoList" class="photos"></div>
+        <p class="error" id="photoError" hidden></p>
+        <h2>Variations</h2>
+        <form id="variationForm" class="inline">
+          <input id="varDesc" placeholder="What changed" required />
+          <input id="varAmount" class="office-only" inputmode="decimal" placeholder="Amount $" />
+          <button type="submit">Add variation</button>
+        </form>
+        <p class="error" id="varError" hidden></p>
+        <table>
+          <thead><tr><th>What</th><th>Status</th><th class="office-only">Amount</th><th></th></tr></thead>
+          <tbody id="varBody"></tbody>
+        </table>
       </div>
       <div class="card">
         <h2>Notes</h2>
@@ -433,17 +485,28 @@ body.field .office-only { display: none !important; }
             <input id="customerTypeahead" list="customerOptions" autocomplete="off" required />
             <datalist id="customerOptions"></datalist>
           </label>
-          <label>Site
-            <select id="siteSelect"><option value="">No site</option></select>
+          <label>Site address
+            <input id="newSiteAddress" list="newSiteOptions" autocomplete="off" placeholder="Street, suburb" />
+            <datalist id="newSiteOptions"></datalist>
           </label>
-          <details>
-            <summary>New site</summary>
-            <label>Label<input id="newSiteLabel" /></label>
-            <label>Address<input id="newSiteAddress" /></label>
-            <button type="button" id="addSiteBtn">Save site</button>
-          </details>
+          <label>Site notes
+            <input id="newSiteNotes" placeholder="Gate, dog, meter, access" />
+          </label>
+          <label>Template
+            <select id="jobTemplate"><option value="">None</option></select>
+          </label>
           <label>Scheduled<input id="newScheduled" type="date" /></label>
           <label>First task<input id="firstTaskTitle" placeholder="e.g. Switchboard" /></label>
+          <label>Type
+            <select id="newModel">
+              <option value="tm">TM</option>
+              <option value="quoted">Quoted</option>
+              <option value="measured">Measured</option>
+            </select>
+          </label>
+          <label class="office-only">Quoted $
+            <input id="newQuoted" inputmode="decimal" placeholder="0.00" />
+          </label>
           <label>Status
             <select id="newStatus">
               <option value="enquiry">Enquiry</option>
@@ -480,6 +543,17 @@ body.field .office-only { display: none !important; }
       <div class="card">
         <h1 id="custTitle"></h1>
         <p class="meta" id="custMeta"></p>
+        <h2>Sites</h2>
+        <form id="custSiteForm" class="stack">
+          <input id="custSiteAddress" placeholder="Street, suburb" required />
+          <input id="custSiteNotes" placeholder="Gate, dog, meter, access" />
+          <button type="submit">Add or save address</button>
+        </form>
+        <p class="error" id="custSiteError" hidden></p>
+        <table>
+          <thead><tr><th>Address</th><th>Notes</th></tr></thead>
+          <tbody id="custSiteBody"></tbody>
+        </table>
         <h2>Jobs</h2>
         <table class="jobs-table">
           <thead>
@@ -510,9 +584,20 @@ body.field .office-only { display: none !important; }
         </form>
         <p class="error" id="empError" hidden></p>
         <table>
-          <thead><tr><th>Name</th><th>Classification</th></tr></thead>
+          <thead><tr><th>Name</th><th>Classification</th><th class="office-only">Cost $/h</th><th class="office-only">Charge $/h</th></tr></thead>
           <tbody id="empBody"></tbody>
         </table>
+      </div>
+      <div class="card office-only" id="chargeCard">
+        <h2>Charge-out</h2>
+        <p class="hint">charge = (person cost + overhead) / (1 − profit). Field never sees this.</p>
+        <div class="row">
+          <label>Overhead $/h<input id="overhead" inputmode="decimal" placeholder="0.00" /></label>
+          <label>Profit %<input id="profitPct" inputmode="decimal" placeholder="20" /></label>
+        </div>
+        <button type="button" id="writeRates">Write charge rates</button>
+        <p class="meta" id="chargePreview"></p>
+        <p class="error" id="chargeError" hidden></p>
       </div>
     </section>
 
@@ -546,6 +631,15 @@ body.field .office-only { display: none !important; }
             <tbody id="eqCatBody"></tbody>
           </table>
         </div>
+      </div>
+      <div class="card">
+        <h1>Templates</h1>
+        <p class="hint">Start a typical job. Save one from a job card.</p>
+        <p class="error" id="tmplError" hidden></p>
+        <table>
+          <thead><tr><th>Name</th><th>Job title</th></tr></thead>
+          <tbody id="tmplBody"></tbody>
+        </table>
       </div>
     </section>
   </main>
@@ -587,6 +681,9 @@ const JOBS = (() => {
     jobsView: "list",
     weekMonday: null,
     allocations: [],
+    templates: [],
+    employeeCosts: {},
+    chargeRates: {},
   };
 
   const $ = (id) => document.getElementById(id);
@@ -762,7 +859,7 @@ const JOBS = (() => {
   }
 
   async function loadJobs() {
-    state.jobs = await rest("GET", "jobs", { query: "?select=*,customers(name),sites(label,address)&order=created_at.desc" });
+    state.jobs = await rest("GET", "jobs", { query: "?select=*,customers(name,phone),sites(label,address,notes)&order=created_at.desc" });
     await loadHours();
     renderJobs();
   }
@@ -777,8 +874,25 @@ const JOBS = (() => {
 
   async function loadEmployees() {
     state.employees = await rest("GET", "employees", { query: "?select=*&order=name.asc" });
+    state.employeeCosts = {};
+    state.chargeRates = {};
+    if (isOffice()) {
+      const costs = await rest("GET", "employee_costs", { query: "?select=*" });
+      state.employeeCosts = Object.fromEntries(costs.map((r) => [r.employee_id, r.cost_cents_per_hour]));
+      const rates = await rest("GET", "rate_book", { query: "?select=*" });
+      for (const r of rates) {
+        if (r.employee_id) state.chargeRates[r.employee_id] = r.charge_cents_per_hour;
+      }
+      const settings = await rest("GET", "charge_settings", { query: `?operator_id=eq.${state.profile.operator_id}&select=*` });
+      if (settings[0]) {
+        $("overhead").value = dollars(settings[0].overhead_cents_per_hour);
+        $("profitPct").value = String((settings[0].profit_bps || 0) / 100);
+      }
+    }
     $("empBody").innerHTML = state.employees.map((e) =>
-      `<tr><td>${escapeHtml(e.name)}</td><td>${classLabel(e.classification)}</td></tr>`
+      `<tr data-emp="${e.id}"><td>${escapeHtml(e.name)}</td><td>${classLabel(e.classification)}</td>
+       <td class="office-only"><input data-cost="${e.id}" inputmode="decimal" value="${dollars(state.employeeCosts[e.id])}" /></td>
+       <td class="office-only">${dollars(state.chargeRates[e.id])}</td></tr>`
     ).join("");
     $("employeeChecks").innerHTML = state.employees.filter((e) => e.active !== false).map((e) =>
       `<label><input type="checkbox" name="emp" value="${e.id}" /> ${escapeHtml(e.name)} <span class="meta">${classLabel(e.classification)}</span></label>`
@@ -807,6 +921,92 @@ const JOBS = (() => {
     $("equipmentCat").innerHTML = `<option value="">Ad-hoc</option>` + state.equipmentCat.map((r) =>
       `<option value="${r.id}" data-name="${escapeHtml(r.name)}" data-cost="${ec[r.id] ?? ""}">${escapeHtml(r.name)}</option>`
     ).join("");
+    await loadTemplates();
+  }
+
+  async function loadTemplates() {
+    state.templates = await rest("GET", "job_templates", { query: "?select=*&order=name.asc" });
+    $("tmplBody").innerHTML = state.templates.map((t) =>
+      `<tr><td>${escapeHtml(t.name)}</td><td>${escapeHtml(t.title)}</td></tr>`
+    ).join("") || `<tr><td colspan="2">None yet. Save as template from a job.</td></tr>`;
+    $("jobTemplate").innerHTML = `<option value="">None</option>` + state.templates.map((t) =>
+      `<option value="${t.id}">${escapeHtml(t.name)}</option>`
+    ).join("");
+  }
+
+  async function applyTemplate(jobId, templateId) {
+    const tasks = await rest("GET", "job_template_tasks", { query: `?template_id=eq.${templateId}&select=*&order=sort_order.asc` });
+    const lines = await rest("GET", "job_template_lines", { query: `?template_id=eq.${templateId}&select=*` });
+    let costs = {};
+    if (isOffice() && lines.length) {
+      const ids = lines.map((l) => l.id);
+      const rows = await rest("GET", "job_template_line_costs", { query: `?line_id=in.(${ids.join(",")})&select=*` });
+      costs = Object.fromEntries(rows.map((r) => [r.line_id, r.unit_cost_cents]));
+    }
+    const taskMap = {};
+    if (!tasks.length) {
+      await rest("POST", "job_tasks", { body: { job_id: jobId, title: "General", number: "", status: "enquiry" } });
+      return;
+    }
+    for (const t of tasks) {
+      const nt = await rest("POST", "job_tasks", { body: { job_id: jobId, title: t.title, number: "", status: "enquiry" } });
+      taskMap[t.id] = nt[0].id;
+    }
+    for (const line of lines) {
+      const task_id = taskMap[line.task_id];
+      if (!task_id) continue;
+      const table = line.kind === "material" ? "material_entries" : "equipment_entries";
+      const created = await rest("POST", table, { body: {
+        job_id: jobId, task_id, description: line.description, qty: line.qty,
+      }});
+      const cents = costs[line.id];
+      if (isOffice() && cents != null) {
+        if (line.kind === "material") await rest("POST", "material_costs", { body: { material_id: created[0].id, unit_cost_cents: cents } });
+        else await rest("POST", "equipment_costs", { body: { equipment_id: created[0].id, unit_cost_cents: cents } });
+      }
+    }
+  }
+
+  async function saveAsTemplate() {
+    const src = state.currentJob;
+    const name = window.prompt("Template name", src.title);
+    if (!name) return;
+    const tmpl = await rest("POST", "job_templates", { body: {
+      name: name.trim(), title: src.title, summary: src.summary, model: src.model || "tm",
+    }});
+    const tid = tmpl[0].id;
+    const tasks = await rest("GET", "job_tasks", { query: `?job_id=eq.${src.id}&select=*&order=number.asc` });
+    const taskMap = {};
+    let sort = 0;
+    for (const t of tasks) {
+      const nt = await rest("POST", "job_template_tasks", { body: { template_id: tid, title: t.title, sort_order: sort++ } });
+      taskMap[t.id] = nt[0].id;
+    }
+    const mats = await rest("GET", "material_entries", { query: `?job_id=eq.${src.id}&select=*` });
+    for (const m of mats) {
+      const task_id = taskMap[m.task_id];
+      if (!task_id) continue;
+      const line = await rest("POST", "job_template_lines", { body: {
+        template_id: tid, task_id, kind: "material", description: m.description, qty: m.qty,
+      }});
+      if (isOffice()) {
+        const costs = await rest("GET", "material_costs", { query: `?material_id=eq.${m.id}&select=unit_cost_cents` });
+        if (costs[0]) await rest("POST", "job_template_line_costs", { body: { line_id: line[0].id, unit_cost_cents: costs[0].unit_cost_cents } });
+      }
+    }
+    const eqs = await rest("GET", "equipment_entries", { query: `?job_id=eq.${src.id}&select=*` });
+    for (const m of eqs) {
+      const task_id = taskMap[m.task_id];
+      if (!task_id) continue;
+      const line = await rest("POST", "job_template_lines", { body: {
+        template_id: tid, task_id, kind: "equipment", description: m.description, qty: m.qty,
+      }});
+      if (isOffice()) {
+        const costs = await rest("GET", "equipment_costs", { query: `?equipment_id=eq.${m.id}&select=unit_cost_cents` });
+        if (costs[0]) await rest("POST", "job_template_line_costs", { body: { line_id: line[0].id, unit_cost_cents: costs[0].unit_cost_cents } });
+      }
+    }
+    await loadTemplates();
   }
 
   function sortJobs(items) {
@@ -818,13 +1018,17 @@ const JOBS = (() => {
       else if (key === "hours") { av = jobHours(a.id); bv = jobHours(b.id); }
       else if (key === "scheduled") { av = a.scheduled_on || ""; bv = b.scheduled_on || ""; }
       else if (key === "customer") { av = (a.customers?.name || "").toLowerCase(); bv = (b.customers?.name || "").toLowerCase(); }
-      else if (key === "site") { av = (a.sites?.label || "").toLowerCase(); bv = (b.sites?.label || "").toLowerCase(); }
+      else if (key === "site") { av = siteAddress(a).toLowerCase(); bv = siteAddress(b).toLowerCase(); }
       else if (key === "status") { av = a.status; bv = b.status; }
       else { av = (a.title || "").toLowerCase(); bv = (b.title || "").toLowerCase(); }
       if (av < bv) return -1 * dir;
       if (av > bv) return 1 * dir;
       return 0;
     });
+  }
+
+  function siteAddress(j) {
+    return (j?.sites?.address || j?.sites?.label || "").trim();
   }
 
   function renderJobs() {
@@ -834,7 +1038,7 @@ const JOBS = (() => {
     let items = state.jobs.filter((j) => {
       const blob = [
         j.number, j.title, j.summary, statusLabel(j.status), j.notes,
-        j.customers?.name, j.sites?.label, j.sites?.address, j.scheduled_on,
+        j.customers?.name, j.sites?.label, j.sites?.address, j.sites?.notes, j.scheduled_on,
       ].join(" ").toLowerCase();
       if (term && !blob.includes(term)) return false;
       if (status && j.status !== status) return false;
@@ -851,7 +1055,7 @@ const JOBS = (() => {
       <td class="num">${escapeHtml(j.number)}</td>
       <td>${escapeHtml(j.title)}</td>
       <td>${escapeHtml(j.customers?.name || "")}</td>
-      <td>${escapeHtml(j.sites?.label || "")}</td>
+      <td>${escapeHtml(siteAddress(j))}</td>
       <td>${escapeHtml(statusLabel(j.status))}</td>
       <td>${escapeHtml(j.scheduled_on || "")}</td>
       <td>${hhmm(jobHours(j.id))}</td>
@@ -861,13 +1065,17 @@ const JOBS = (() => {
   function setJobsView(mode) {
     state.jobsView = mode;
     const week = mode === "week";
-    $("listViewBtn").classList.toggle("on", !week);
+    const invoice = mode === "invoice";
+    $("listViewBtn").classList.toggle("on", mode === "list");
     $("weekViewBtn").classList.toggle("on", week);
-    $("jobsListPane").hidden = week;
-    $("quickFilters").hidden = week;
+    $("invoiceViewBtn").classList.toggle("on", invoice);
+    $("jobsListPane").hidden = mode !== "list";
+    $("quickFilters").hidden = mode !== "list";
     $("weekBar").hidden = !week;
     $("weekView").hidden = !week;
+    $("invoiceView").hidden = !invoice;
     if (week) renderWeek();
+    if (invoice) renderInvoiceList();
   }
 
   async function loadWeekAllocations() {
@@ -920,7 +1128,7 @@ const JOBS = (() => {
         }).join(", ");
         return `<button type="button" class="job-chip" data-id="${j.id}">
           <strong>${escapeHtml(j.number)}</strong> ${escapeHtml(j.title)}
-          <span class="who">${escapeHtml(statusLabel(j.status))}${names ? " · " : ""}${names || "No crew"}</span>
+          <span class="who">${escapeHtml(siteAddress(j) || statusLabel(j.status))}${names ? " · " : " · "}${names || "No crew"}</span>
         </button>`;
       }).join("") || `<p class="meta">—</p>`;
       return `<div class="day-col${iso === today ? " today" : ""}">
@@ -966,27 +1174,36 @@ const JOBS = (() => {
     const box = $("crewChecks");
     const err = $("crewError");
     err.hidden = true;
-    const date = state.currentJob?.scheduled_on;
+    const date = $("crewDate")?.value || state.currentJob?.scheduled_on;
     if (!date) {
-      box.innerHTML = `<p class="meta">Set a scheduled date first.</p>`;
+      box.innerHTML = `<p class="meta">Pick a date first.</p>`;
+      $("crewDays").textContent = "";
       return;
     }
     if (!state.employees.length) await loadEmployees();
     const rows = await rest("GET", "job_allocations", {
-      query: `?job_id=eq.${state.currentJob.id}&work_date=eq.${date}&select=id,employee_id`,
+      query: `?job_id=eq.${state.currentJob.id}&select=id,employee_id,work_date,employees(name)&order=work_date.asc`,
     });
-    const on = new Set(rows.map((r) => r.employee_id));
+    const on = new Set(rows.filter((r) => r.work_date === date).map((r) => r.employee_id));
     const people = state.employees.filter((e) => e.active !== false);
     box.innerHTML = people.map((e) =>
       `<label><input type="checkbox" data-emp="${e.id}" ${on.has(e.id) ? "checked" : ""} /> ${escapeHtml(e.name)}</label>`
     ).join("") || `<p class="meta">Add employees first.</p>`;
+    const byDay = {};
+    for (const r of rows) {
+      byDay[r.work_date] = byDay[r.work_date] || [];
+      byDay[r.work_date].push(r.employees?.name || "");
+    }
+    $("crewDays").textContent = Object.keys(byDay).length
+      ? Object.entries(byDay).map(([d, names]) => `${d}: ${names.join(", ")}`).join(" · ")
+      : "No other days yet.";
   }
 
   async function toggleCrew(employeeId, checked) {
     const err = $("crewError");
     err.hidden = true;
-    const date = state.currentJob?.scheduled_on;
-    if (!date) throw new Error("Set a scheduled date first");
+    const date = $("crewDate")?.value || state.currentJob?.scheduled_on;
+    if (!date) throw new Error("Pick a date first");
     if (checked) {
       await rest("POST", "job_allocations", {
         body: { job_id: state.currentJob.id, employee_id: employeeId, work_date: date },
@@ -996,18 +1213,16 @@ const JOBS = (() => {
         query: `?job_id=eq.${state.currentJob.id}&employee_id=eq.${employeeId}&work_date=eq.${date}`,
       });
     }
+    await loadCrew();
   }
 
-  async function fillJobSites(customerId, selected) {
-    if (!customerId) {
-      $("jobSiteSelect").innerHTML = `<option value="">No site</option>`;
-      return;
-    }
-    const sites = await rest("GET", "sites", { query: `?customer_id=eq.${customerId}&select=*&order=label.asc` });
-    $("jobSiteSelect").innerHTML = `<option value="">No site</option>` + sites.map((s) =>
-      `<option value="${s.id}">${escapeHtml(s.label)}</option>`
-    ).join("");
-    $("jobSiteSelect").value = selected || "";
+  async function loadCustomerSites(customerId) {
+    if (!customerId) return [];
+    return rest("GET", "sites", { query: `?customer_id=eq.${customerId}&select=*&order=address.asc` });
+  }
+
+  function fillSiteDatalist(datalistId, sites) {
+    $(datalistId).innerHTML = sites.map((s) => `<option value="${escapeHtml(s.address || s.label)}"></option>`).join("");
   }
 
   async function fillJobPlaces() {
@@ -1016,7 +1231,47 @@ const JOBS = (() => {
       `<option value="${c.id}">${escapeHtml(c.name)}</option>`
     ).join("");
     $("jobCustomerSelect").value = state.currentJob.customer_id;
-    await fillJobSites(state.currentJob.customer_id, state.currentJob.site_id);
+    const sites = await loadCustomerSites(state.currentJob.customer_id);
+    fillSiteDatalist("jobSiteOptions", sites);
+    const current = sites.find((s) => s.id === state.currentJob.site_id);
+    $("jobSiteAddress").value = current?.address || current?.label || "";
+    $("jobSiteNotes").value = current?.notes || "";
+  }
+
+  async function saveJobSite() {
+    const customer_id = $("jobCustomerSelect").value;
+    const address = $("jobSiteAddress").value.trim();
+    const notes = $("jobSiteNotes").value.trim() || null;
+    if (!address) {
+      await patchJob({ site_id: null });
+      return;
+    }
+    const sites = await loadCustomerSites(customer_id);
+    const match = sites.find((s) => (s.address || s.label || "").toLowerCase() === address.toLowerCase());
+    if (match) {
+      await rest("PATCH", "sites", { query: `?id=eq.${match.id}`, body: { address, notes } });
+      await patchJob({ site_id: match.id });
+    } else if (state.currentJob.site_id) {
+      await rest("PATCH", "sites", { query: `?id=eq.${state.currentJob.site_id}`, body: { address, notes } });
+    } else {
+      const created = await rest("POST", "sites", { body: { customer_id, address, label: address, notes } });
+      await patchJob({ site_id: created[0].id });
+    }
+    await fillJobPlaces();
+    await loadJobs();
+  }
+
+  async function ensureSite(customerId, address, notes) {
+    const addr = (address || "").trim();
+    if (!addr) return null;
+    const sites = await loadCustomerSites(customerId);
+    const match = sites.find((s) => (s.address || s.label || "").toLowerCase() === addr.toLowerCase());
+    if (match) {
+      if (notes != null) await rest("PATCH", "sites", { query: `?id=eq.${match.id}`, body: { notes: notes || null, address: addr } });
+      return match.id;
+    }
+    const created = await rest("POST", "sites", { body: { customer_id: customerId, address: addr, label: addr, notes: notes || null } });
+    return created[0].id;
   }
 
   async function patchJob(body) {
@@ -1027,17 +1282,146 @@ const JOBS = (() => {
     if (rows && rows[0]) Object.assign(state.currentJob, rows[0]);
   }
 
+  async function loadPack() {
+    const jid = state.currentJob.id;
+    const labour = await rest("GET", "labour_entries", { query: `?job_id=eq.${jid}&select=id&limit=1` });
+    const photos = await rest("GET", "job_photos", { query: `?job_id=eq.${jid}&select=*&order=created_at.desc` });
+    const checks = await rest("GET", "job_completion_checks", { query: `?job_id=eq.${jid}&select=*&order=sort_order.asc` });
+    const vars = await rest("GET", "job_variations", { query: `?job_id=eq.${jid}&select=*&order=created_at.asc` });
+    let amounts = {};
+    if (isOffice() && vars.length) {
+      const rows = await rest("GET", "job_variation_amounts", { query: `?variation_id=in.(${vars.map((v) => v.id).join(",")})&select=*` });
+      amounts = Object.fromEntries(rows.map((r) => [r.variation_id, r.amount_cents]));
+    }
+    const missing = [];
+    if (!labour.length) missing.push("labour");
+    if (!photos.length) missing.push("photo");
+    if (!checks.length || checks.some((c) => !c.done)) missing.push("checks");
+    if (vars.some((v) => v.status === "pending")) missing.push("variations");
+    $("packStatus").textContent = missing.length ? `Missing: ${missing.join(", ")}` : "Pack complete";
+    $("checkList").innerHTML = checks.map((c) =>
+      `<label><input type="checkbox" data-check="${c.id}" ${c.done ? "checked" : ""} /> ${escapeHtml(c.label)}</label>`
+    ).join("") || `<p class="meta">No checks.</p>`;
+    $("varBody").innerHTML = vars.map((v) => `<tr data-var="${v.id}">
+      <td>${escapeHtml(v.description)}</td>
+      <td>${escapeHtml(v.status)}</td>
+      <td class="office-only">${dollars(amounts[v.id])}</td>
+      <td>${v.status === "pending" ? `<button type="button" class="ghost" data-accept="${v.id}">Accept</button> <button type="button" class="ghost" data-decline="${v.id}">Decline</button>` : ""}</td>
+    </tr>`).join("") || `<tr><td colspan="4">No variations</td></tr>`;
+    const imgs = [];
+    for (const p of photos) {
+      const url = await signedPhoto(p.storage_path);
+      imgs.push(`<img src="${escapeHtml(url)}" alt="${escapeHtml(p.file_name || "photo")}" />`);
+    }
+    $("photoList").innerHTML = imgs.join("") || `<p class="meta">No photos</p>`;
+    return { missing, photos, checks, vars };
+  }
+
+  async function signedPhoto(path) {
+    const res = await fetch(`${CONFIG.url}/storage/v1/object/sign/job-photos/${path}`, {
+      method: "POST",
+      headers: headers(),
+      body: JSON.stringify({ expiresIn: 3600 }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) return "";
+    const signed = data.signedURL || data.signedUrl || "";
+    if (!signed) return "";
+    return signed.startsWith("http") ? signed : `${CONFIG.url}/storage/v1${signed}`;
+  }
+
+  async function uploadPhoto(file) {
+    const op = state.profile.operator_id;
+    const jid = state.currentJob.id;
+    const ext = (file.name.split(".").pop() || "jpg").toLowerCase().replace(/[^a-z0-9]/g, "") || "jpg";
+    const path = `${op}/${jid}/${crypto.randomUUID()}.${ext}`;
+    const res = await fetch(`${CONFIG.url}/storage/v1/object/job-photos/${path}`, {
+      method: "POST",
+      headers: {
+        apikey: CONFIG.anonKey,
+        Authorization: `Bearer ${state.session.access_token}`,
+        "Content-Type": file.type || "application/octet-stream",
+        "x-upsert": "false",
+      },
+      body: file,
+    });
+    if (!res.ok) {
+      const t = await res.text();
+      throw new Error(t || "Photo upload failed");
+    }
+    await rest("POST", "job_photos", { body: { job_id: jid, storage_path: path, file_name: file.name } });
+  }
+
+  async function renderInvoiceList() {
+    const jobs = state.jobs.filter((j) => ["complete", "to_invoice"].includes(j.status) || state.quickFilter === "to_invoice");
+    const rows = [];
+    for (const j of state.jobs.filter((x) => x.status !== "invoiced" && x.status !== "enquiry")) {
+      const labour = await rest("GET", "labour_entries", { query: `?job_id=eq.${j.id}&select=id&limit=1` });
+      const photos = await rest("GET", "job_photos", { query: `?job_id=eq.${j.id}&select=id&limit=1` });
+      const checks = await rest("GET", "job_completion_checks", { query: `?job_id=eq.${j.id}&select=done` });
+      const vars = await rest("GET", "job_variations", { query: `?job_id=eq.${j.id}&select=status` });
+      const missing = [];
+      if (!labour.length) missing.push("labour");
+      if (!photos.length) missing.push("photo");
+      if (!checks.length || checks.some((c) => !c.done)) missing.push("checks");
+      if (vars.some((v) => v.status === "pending")) missing.push("variations");
+      if (j.status !== "complete" && j.status !== "to_invoice" && missing.length) continue;
+      if (j.status !== "complete" && j.status !== "to_invoice" && !missing.length) {
+        rows.push({ j, missing, ready: true });
+        continue;
+      }
+      rows.push({ j, missing, ready: !missing.length });
+    }
+    const show = state.jobs.filter((j) => j.status === "complete" || j.status === "to_invoice");
+    const lined = [];
+    for (const j of show) {
+      const labour = await rest("GET", "labour_entries", { query: `?job_id=eq.${j.id}&select=id&limit=1` });
+      const photos = await rest("GET", "job_photos", { query: `?job_id=eq.${j.id}&select=id&limit=1` });
+      const checks = await rest("GET", "job_completion_checks", { query: `?job_id=eq.${j.id}&select=done` });
+      const vars = await rest("GET", "job_variations", { query: `?job_id=eq.${j.id}&select=status` });
+      const missing = [];
+      if (!labour.length) missing.push("labour");
+      if (!photos.length) missing.push("photo");
+      if (!checks.length || checks.some((c) => !c.done)) missing.push("checks");
+      if (vars.some((v) => v.status === "pending")) missing.push("variations");
+      lined.push({ j, missing });
+    }
+    $("invoiceView").innerHTML = `<div class="card"><h2>To invoice</h2>
+      <p class="hint">Pack needs labour, a photo, checks ticked, and no pending variations.</p>
+      <table class="jobs-table"><thead><tr><th>Number</th><th>Job</th><th>Status</th><th>Pack</th></tr></thead>
+      <tbody>${lined.map(({ j, missing }) => `<tr data-id="${j.id}">
+        <td class="num">${escapeHtml(j.number)}</td>
+        <td>${escapeHtml(j.title)}</td>
+        <td>${escapeHtml(statusLabel(j.status))}</td>
+        <td>${missing.length ? escapeHtml(missing.join(", ")) : "Ready"}</td>
+      </tr>`).join("") || `<tr><td colspan="4">No complete jobs</td></tr>`}</tbody></table></div>`;
+  }
+
+  function chargeCents(direct, overhead, profitBps) {
+    const d = Number(direct) || 0;
+    const o = Number(overhead) || 0;
+    const p = Number(profitBps) || 0;
+    if (p >= 10000) throw new Error("Profit must be under 100%");
+    return Math.round((d + o) * 10000 / (10000 - p));
+  }
+
   async function openJob(id) {
-    const job = await rest("GET", "jobs", { query: `?id=eq.${id}&select=*,customers(name,phone),sites(label,address)` });
+    const job = await rest("GET", "jobs", { query: `?id=eq.${id}&select=*,customers(name,phone),sites(label,address,notes)` });
     state.currentJob = job[0];
     if (!state.currentJob) return;
     $("jobTitle").textContent = `${state.currentJob.number} · ${state.currentJob.title}`;
     $("jobStatus").value = state.currentJob.status;
     $("jobScheduled").value = state.currentJob.scheduled_on || "";
+    $("crewDate").value = state.currentJob.scheduled_on || isoDate(new Date());
     $("jobNotes").value = state.currentJob.notes || "";
+    $("jobModel").value = state.currentJob.model || "tm";
+    $("jobQuoted").value = state.currentJob.quoted_amount_cents != null ? dollars(state.currentJob.quoted_amount_cents) : "";
+    const phone = state.currentJob.customers?.phone;
+    $("jobPhone").textContent = phone ? `Phone ${phone}` : "";
     $("jobError").hidden = true;
     await fillJobPlaces();
     await loadCrew();
+    await loadPack();
     await loadTasks();
     await loadJobSummary();
     show("jobView");
@@ -1059,6 +1443,12 @@ const JOBS = (() => {
       <td>${escapeHtml(j.scheduled_on || "")}</td>
       <td>${hhmm(jobHours(j.id))}</td>
     </tr>`).join("") || `<tr><td colspan="5">No jobs</td></tr>`;
+    const sites = await loadCustomerSites(id);
+    $("custSiteBody").innerHTML = sites.map((s) =>
+      `<tr data-site="${s.id}"><td>${escapeHtml(s.address || s.label)}</td><td>${escapeHtml(s.notes || "")}</td></tr>`
+    ).join("") || `<tr><td colspan="2">No addresses</td></tr>`;
+    $("custSiteAddress").value = "";
+    $("custSiteNotes").value = "";
     show("customerView");
     setTab("customers");
   }
@@ -1445,13 +1835,12 @@ const JOBS = (() => {
         if (!date) throw new Error("Set a scheduled date first");
       }
       if (status === "to_invoice") {
-        const labour = await rest("GET", "labour_entries", {
-          query: `?job_id=eq.${state.currentJob.id}&select=id&limit=1`,
-        });
-        if (!labour.length) throw new Error("Add labour before To invoice");
+        const pack = await loadPack();
+        if (pack.missing.length) throw new Error(pack.missing[0] === "labour" ? "Add labour before To invoice" : pack.missing[0] === "photo" ? "Add a photo before To invoice" : pack.missing[0] === "checks" ? "Complete the checks before To invoice" : "Accept or decline variations before To invoice");
       }
       await patchJob({ status });
       await loadJobs();
+      await loadPack();
     } catch (err) {
       $("jobStatus").value = state.currentJob.status;
       $("jobError").textContent = err.message;
@@ -1463,6 +1852,7 @@ const JOBS = (() => {
     $("jobError").hidden = true;
     try {
       await patchJob({ scheduled_on: $("jobScheduled").value || null });
+      if ($("jobScheduled").value && !$("crewDate").value) $("crewDate").value = $("jobScheduled").value;
       await loadJobs();
       await loadCrew();
     } catch (err) {
@@ -1476,8 +1866,10 @@ const JOBS = (() => {
     $("jobError").hidden = true;
     try {
       const customer_id = $("jobCustomerSelect").value;
-      await fillJobSites(customer_id, null);
       await patchJob({ customer_id, site_id: null });
+      $("jobSiteAddress").value = "";
+      $("jobSiteNotes").value = "";
+      await fillJobPlaces();
       await loadJobs();
     } catch (err) {
       $("jobCustomerSelect").value = state.currentJob.customer_id;
@@ -1486,13 +1878,11 @@ const JOBS = (() => {
     }
   });
 
-  $("jobSiteSelect").addEventListener("change", async () => {
+  $("saveSite").addEventListener("click", async () => {
     $("jobError").hidden = true;
     try {
-      await patchJob({ site_id: $("jobSiteSelect").value || null });
-      await loadJobs();
+      await saveJobSite();
     } catch (err) {
-      $("jobSiteSelect").value = state.currentJob.site_id || "";
       $("jobError").textContent = err.message;
       $("jobError").hidden = false;
     }
@@ -1509,13 +1899,178 @@ const JOBS = (() => {
   });
 
   $("duplicateJob").addEventListener("click", duplicateJob);
+  $("saveTemplate").addEventListener("click", async () => {
+    $("jobError").hidden = true;
+    try { await saveAsTemplate(); }
+    catch (err) { $("jobError").textContent = err.message; $("jobError").hidden = false; }
+  });
+  $("jobModel").addEventListener("change", async () => {
+    try { await patchJob({ model: $("jobModel").value }); }
+    catch (err) { $("jobError").textContent = err.message; $("jobError").hidden = false; }
+  });
+  $("jobQuoted").addEventListener("change", async () => {
+    try {
+      const quoted_amount_cents = $("jobQuoted").value ? toCents($("jobQuoted").value) : null;
+      await patchJob({ quoted_amount_cents });
+    } catch (err) {
+      $("jobQuoted").value = state.currentJob.quoted_amount_cents != null ? dollars(state.currentJob.quoted_amount_cents) : "";
+      $("jobError").textContent = err.message; $("jobError").hidden = false;
+    }
+  });
+  $("crewDate").addEventListener("change", () => loadCrew());
+  $("photoFile").addEventListener("change", async () => {
+    $("photoError").hidden = true;
+    const file = $("photoFile").files[0];
+    if (!file) return;
+    try {
+      await uploadPhoto(file);
+      $("photoFile").value = "";
+      await loadPack();
+    } catch (err) {
+      $("photoError").textContent = err.message;
+      $("photoError").hidden = false;
+    }
+  });
+  $("checkList").addEventListener("change", async (e) => {
+    const input = e.target.closest("input[data-check]");
+    if (!input) return;
+    try {
+      await rest("PATCH", "job_completion_checks", { query: `?id=eq.${input.dataset.check}`, body: { done: input.checked } });
+      await loadPack();
+    } catch (err) {
+      input.checked = !input.checked;
+      $("jobError").textContent = err.message; $("jobError").hidden = false;
+    }
+  });
+  $("variationForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    $("varError").hidden = true;
+    try {
+      const created = await rest("POST", "job_variations", { body: {
+        job_id: state.currentJob.id,
+        description: $("varDesc").value.trim(),
+        status: "pending",
+      }});
+      if (isOffice() && $("varAmount").value) {
+        await rest("POST", "job_variation_amounts", { body: {
+          variation_id: created[0].id,
+          amount_cents: toCents($("varAmount").value),
+        }});
+      }
+      $("varDesc").value = "";
+      $("varAmount").value = "";
+      await loadPack();
+    } catch (err) {
+      $("varError").textContent = err.message;
+      $("varError").hidden = false;
+    }
+  });
+  $("varBody").addEventListener("click", async (e) => {
+    const accept = e.target.closest("[data-accept]");
+    const decline = e.target.closest("[data-decline]");
+    const id = accept?.dataset.accept || decline?.dataset.decline;
+    if (!id) return;
+    await rest("PATCH", "job_variations", { query: `?id=eq.${id}`, body: { status: accept ? "accepted" : "declined" } });
+    await loadPack();
+  });
+  $("invoiceViewBtn").addEventListener("click", async () => {
+    await loadJobs();
+    setJobsView("invoice");
+    show("jobsTab");
+    setTab("jobs");
+  });
+  $("invoiceView").addEventListener("click", (e) => {
+    const row = e.target.closest("tr[data-id]");
+    if (row) openJob(row.dataset.id);
+  });
+  $("printToday").addEventListener("click", () => {
+    const today = isoDate(new Date());
+    const jobs = jobsOnDay(today);
+    $("printRun").innerHTML = `<h1>Today ${today}</h1>` + (jobs.map((j) => {
+      const people = crewOnDay(j.id, today).map((a) => a.employees?.name).filter(Boolean).join(", ");
+      return `<p><strong>${escapeHtml(j.number)}</strong> ${escapeHtml(j.title)}<br>${escapeHtml(j.customers?.name || "")}<br>${escapeHtml(siteAddress(j))}<br>${escapeHtml(people || "No crew")}</p>`;
+    }).join("") || "<p>No jobs today</p>");
+    window.print();
+  });
+  $("custSiteForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    $("custSiteError").hidden = true;
+    try {
+      await ensureSite(state.currentCustomer.id, $("custSiteAddress").value, $("custSiteNotes").value);
+      await openCustomer(state.currentCustomer.id);
+    } catch (err) {
+      $("custSiteError").textContent = err.message;
+      $("custSiteError").hidden = false;
+    }
+  });
+  $("custSiteBody").addEventListener("click", (e) => {
+    const row = e.target.closest("tr[data-site]");
+    if (!row) return;
+    const addr = row.children[0].textContent;
+    const notes = row.children[1].textContent;
+    $("custSiteAddress").value = addr;
+    $("custSiteNotes").value = notes;
+  });
+  $("empBody").addEventListener("change", async (e) => {
+    const input = e.target.closest("input[data-cost]");
+    if (!input || !isOffice()) return;
+    $("empError").hidden = true;
+    try {
+      const cents = input.value ? toCents(input.value) : 0;
+      const existing = state.employeeCosts[input.dataset.cost];
+      if (existing != null) {
+        await rest("PATCH", "employee_costs", { query: `?employee_id=eq.${input.dataset.cost}`, body: { cost_cents_per_hour: cents } });
+      } else {
+        await rest("POST", "employee_costs", { body: { employee_id: input.dataset.cost, cost_cents_per_hour: cents } });
+      }
+      state.employeeCosts[input.dataset.cost] = cents;
+    } catch (err) {
+      $("empError").textContent = err.message;
+      $("empError").hidden = false;
+    }
+  });
+  $("writeRates").addEventListener("click", async () => {
+    $("chargeError").hidden = true;
+    try {
+      const overhead = $("overhead").value ? toCents($("overhead").value) : 0;
+      const pct = Number($("profitPct").value || "0");
+      const profit_bps = Math.round(pct * 100);
+      const existing = await rest("GET", "charge_settings", { query: `?operator_id=eq.${state.profile.operator_id}&select=*` });
+      if (existing.length) {
+        await rest("PATCH", "charge_settings", { query: `?operator_id=eq.${state.profile.operator_id}`, body: { overhead_cents_per_hour: overhead, profit_bps } });
+      } else {
+        await rest("POST", "charge_settings", { body: { operator_id: state.profile.operator_id, overhead_cents_per_hour: overhead, profit_bps } });
+      }
+      const preview = [];
+      for (const e of state.employees) {
+        const direct = state.employeeCosts[e.id];
+        if (direct == null) continue;
+        const charge = chargeCents(direct, overhead, profit_bps);
+        const old = await rest("GET", "rate_book", { query: `?employee_id=eq.${e.id}&select=id` });
+        if (old.length) {
+          await rest("PATCH", "rate_book", { query: `?id=eq.${old[0].id}`, body: { name: e.name, charge_cents_per_hour: charge } });
+        } else {
+          await rest("POST", "rate_book", { body: { name: e.name, employee_id: e.id, charge_cents_per_hour: charge } });
+        }
+        preview.push(`${e.name} ${dollars(charge)}/h`);
+      }
+      $("chargePreview").textContent = preview.join(" · ") || "Add person cost first.";
+      await loadEmployees();
+    } catch (err) {
+      $("chargeError").textContent = err.message;
+      $("chargeError").hidden = false;
+    }
+  });
   $("labourStart").addEventListener("change", updateLabourPreview);
   $("labourFinish").addEventListener("change", updateLabourPreview);
 
   $("newJobBtn").addEventListener("click", async () => {
     $("newJobError").hidden = true;
     await loadCustomers();
-    $("siteSelect").innerHTML = `<option value="">No site</option>`;
+    await loadTemplates();
+    $("newSiteAddress").value = "";
+    $("newSiteNotes").value = "";
+    $("newSiteOptions").innerHTML = "";
     show("newJobView");
   });
   $("cancelNewJob").addEventListener("click", () => show("jobsTab"));
@@ -1523,31 +2078,8 @@ const JOBS = (() => {
   $("customerTypeahead").addEventListener("change", async () => {
     const c = findCustomerByName($("customerTypeahead").value);
     if (!c) return;
-    const sites = await rest("GET", "sites", { query: `?customer_id=eq.${c.id}&select=*&order=label.asc` });
-    $("siteSelect").innerHTML = `<option value="">No site</option>` + sites.map((s) =>
-      `<option value="${s.id}">${escapeHtml(s.label)}</option>`
-    ).join("");
-  });
-
-  $("addSiteBtn").addEventListener("click", async () => {
-    try {
-      const c = findCustomerByName($("customerTypeahead").value) || await ensureCustomer();
-      const label = $("newSiteLabel").value.trim();
-      if (!label) throw new Error("Site label required");
-      const created = await rest("POST", "sites", {
-        body: { customer_id: c.id, label, address: $("newSiteAddress").value.trim() || null },
-      });
-      $("newSiteLabel").value = "";
-      $("newSiteAddress").value = "";
-      const sites = await rest("GET", "sites", { query: `?customer_id=eq.${c.id}&select=*&order=label.asc` });
-      $("siteSelect").innerHTML = `<option value="">No site</option>` + sites.map((s) =>
-        `<option value="${s.id}">${escapeHtml(s.label)}</option>`
-      ).join("");
-      $("siteSelect").value = created[0].id;
-    } catch (err) {
-      $("newJobError").textContent = err.message;
-      $("newJobError").hidden = false;
-    }
+    const sites = await loadCustomerSites(c.id);
+    fillSiteDatalist("newSiteOptions", sites);
   });
 
   $("newJobForm").addEventListener("submit", async (e) => {
@@ -1558,22 +2090,30 @@ const JOBS = (() => {
       const status = $("newStatus").value;
       const scheduled_on = $("newScheduled").value || null;
       if (status === "scheduled" && !scheduled_on) throw new Error("Set a scheduled date first");
+      const site_id = await ensureSite(customer.id, $("newSiteAddress").value, $("newSiteNotes").value);
+      let quoted = null;
+      if (isOffice() && $("newQuoted").value) quoted = toCents($("newQuoted").value);
       const created = await rest("POST", "jobs", { body: {
         title: $("newTitle").value.trim(),
         summary: $("newSummary").value.trim() || null,
         status,
-        model: "tm",
+        model: $("newModel").value,
+        quoted_amount_cents: quoted,
         customer_id: customer.id,
-        site_id: $("siteSelect").value || null,
+        site_id,
         scheduled_on,
         number: "",
       }});
-      await rest("POST", "job_tasks", { body: {
-        job_id: created[0].id,
-        title: $("firstTaskTitle").value.trim() || "General",
-        number: "",
-        status: $("newStatus").value,
-      }});
+      const tmpl = $("jobTemplate").value;
+      if (tmpl) await applyTemplate(created[0].id, tmpl);
+      else {
+        await rest("POST", "job_tasks", { body: {
+          job_id: created[0].id,
+          title: $("firstTaskTitle").value.trim() || "General",
+          number: "",
+          status: $("newStatus").value,
+        }});
+      }
       $("newTitle").value = "";
       $("newSummary").value = "";
       $("firstTaskTitle").value = "";
