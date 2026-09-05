@@ -31,7 +31,29 @@ html, body {
 }
 .brand { font-weight: 650; letter-spacing: -0.02em; }
 .top-right { display: flex; gap: 12px; align-items: center; color: var(--muted); font-size: 14px; }
-main { max-width: 960px; margin: 24px auto; padding: 0 16px 48px; }
+main { max-width: 1100px; margin: 24px auto; padding: 0 16px 24px; }
+.jobs-scroll {
+  overflow: auto;
+  max-height: calc(100vh - 170px);
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+}
+.jobs-table { width: 100%; border-collapse: collapse; }
+.jobs-table thead th {
+  position: sticky;
+  top: 0;
+  background: var(--card);
+  z-index: 1;
+  box-shadow: 0 1px 0 var(--line);
+  font-size: 12px;
+  color: var(--muted);
+  font-weight: 600;
+}
+.jobs-table tbody tr { cursor: pointer; }
+.jobs-table tbody tr:hover { background: var(--bg); }
+.jobs-table td { font-size: 14px; padding: 10px 8px; }
+.jobs-table .num { color: var(--muted); white-space: nowrap; }
 .card {
   background: var(--card);
   border: 1px solid var(--line);
@@ -145,7 +167,7 @@ body.field .office-only { display: none !important; }
 
     <section id="jobsTab" hidden>
       <div class="toolbar">
-        <input id="search" type="search" placeholder="Search jobs" />
+        <input id="search" type="search" placeholder="Search number, job, customer, site" />
         <select id="statusFilter">
           <option value="">All statuses</option>
           <option value="enquiry">Enquiry</option>
@@ -159,7 +181,20 @@ body.field .office-only { display: none !important; }
         <button type="button" id="newJobBtn">New job</button>
       </div>
       <div id="listError" class="error" hidden></div>
-      <ul id="jobList" class="job-list"></ul>
+      <div class="jobs-scroll">
+        <table class="jobs-table">
+          <thead>
+            <tr>
+              <th>Number</th>
+              <th>Job</th>
+              <th>Customer</th>
+              <th>Site</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody id="jobList"></tbody>
+        </table>
+      </div>
     </section>
 
     <section id="jobView" hidden>
@@ -605,16 +640,21 @@ const JOBS = (() => {
     const term = $("search").value.trim().toLowerCase();
     const status = $("statusFilter").value;
     const items = state.jobs.filter((j) => {
-      const blob = `${j.number} ${j.title} ${j.summary || ""} ${j.customers?.name || ""}`.toLowerCase();
+      const blob = [
+        j.number, j.title, j.summary, statusLabel(j.status),
+        j.customers?.name, j.sites?.label, j.sites?.address,
+      ].join(" ").toLowerCase();
       if (term && !blob.includes(term)) return false;
       if (status && j.status !== status) return false;
       return true;
     });
-    $("jobList").innerHTML = items.map((j) => `<li data-id="${j.id}">
-      <div class="num">${escapeHtml(j.number)} · ${statusLabel(j.status)}</div>
-      <strong>${escapeHtml(j.title)}</strong>
-      <div class="meta">${escapeHtml(j.customers?.name || "")}${j.sites?.label ? " · " + escapeHtml(j.sites.label) : ""}</div>
-    </li>`).join("") || `<li>No jobs</li>`;
+    $("jobList").innerHTML = items.map((j) => `<tr data-id="${j.id}">
+      <td class="num">${escapeHtml(j.number)}</td>
+      <td>${escapeHtml(j.title)}</td>
+      <td>${escapeHtml(j.customers?.name || "")}</td>
+      <td>${escapeHtml(j.sites?.label || "")}</td>
+      <td>${escapeHtml(statusLabel(j.status))}</td>
+    </tr>`).join("") || `<tr><td colspan="5">No jobs</td></tr>`;
   }
 
   async function openJob(id) {
@@ -925,8 +965,8 @@ const JOBS = (() => {
   $("search").addEventListener("input", renderJobs);
   $("statusFilter").addEventListener("change", renderJobs);
   $("jobList").addEventListener("click", (e) => {
-    const li = e.target.closest("li[data-id]");
-    if (li) openJob(li.dataset.id);
+    const row = e.target.closest("tr[data-id]");
+    if (row) openJob(row.dataset.id);
   });
   $("taskList").addEventListener("click", (e) => {
     const li = e.target.closest("li[data-id]");
