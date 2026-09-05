@@ -71,6 +71,13 @@ button.link, .link {
 }
 .toolbar { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
 .toolbar input, .toolbar select { width: auto; min-width: 180px; flex: 1; }
+.job-actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: end; margin: 12px 0 4px; }
+.job-actions label { margin: 0; min-width: 180px; flex: 0 1 220px; }
+button.ghost {
+  background: #fff;
+  color: var(--accent);
+  border: 1px solid var(--line);
+}
 .job-list { list-style: none; padding: 0; margin: 0; }
 .job-list li {
   background: var(--card);
@@ -159,8 +166,23 @@ body.field .office-only { display: none !important; }
       <button type="button" class="link" id="backToList">← Jobs</button>
       <div class="job-head">
         <h1 id="jobTitle"></h1>
-        <p class="meta" id="jobMeta"></p>
         <p id="jobCustomer"></p>
+        <div class="job-actions">
+          <label>Status
+            <select id="jobStatus">
+              <option value="enquiry">Enquiry</option>
+              <option value="quoted">Quoted</option>
+              <option value="scheduled">Scheduled</option>
+              <option value="on_site">On site</option>
+              <option value="complete">Complete</option>
+              <option value="to_invoice">To invoice</option>
+              <option value="invoiced">Invoiced</option>
+            </select>
+          </label>
+          <button type="button" class="ghost" id="duplicateJob">Duplicate job</button>
+        </div>
+        <p class="hint">Duplicate copies customer, site, tasks, materials and equipment. Not hours.</p>
+        <p class="error" id="jobError" hidden></p>
       </div>
       <div class="card" id="jobSummary">
         <h2>Job summary</h2>
@@ -600,7 +622,8 @@ const JOBS = (() => {
     state.currentJob = job[0];
     if (!state.currentJob) return;
     $("jobTitle").textContent = `${state.currentJob.number} · ${state.currentJob.title}`;
-    $("jobMeta").textContent = statusLabel(state.currentJob.status);
+    $("jobStatus").value = state.currentJob.status;
+    $("jobError").hidden = true;
     const c = state.currentJob.customers;
     const s = state.currentJob.sites;
     $("jobCustomer").textContent = [c?.name, c?.phone, s?.label, s?.address].filter(Boolean).join(" · ") || "—";
@@ -745,6 +768,77 @@ const JOBS = (() => {
     </tr>`).join("");
   }
 
+  async function copyCosts(table, idField, oldId, newId) {
+    if (!isOffice()) return;
+    const rows = await rest("GET", table, { query: `?${idField}=eq.${oldId}&select=unit_cost_cents` });
+    if (!rows.length) return;
+    await rest("POST", table, { body: { [idField]: newId, unit_cost_cents: rows[0].unit_cost_cents } });
+  }
+
+  async function duplicateJob() {
+    $("jobError").hidden = true;
+    const src = state.currentJob;
+    if (!src) return;
+    try {
+      const created = await rest("POST", "jobs", { body: {
+        title: src.title,
+        summary: src.summary,
+        model: src.model || "tm",
+        status: "enquiry",
+        customer_id: src.customer_id,
+        site_id: src.site_id || null,
+        measured_unit: src.measured_unit,
+        measured_qty: src.measured_qty,
+        quoted_amount_cents: src.quoted_amount_cents,
+        number: "",
+      }});
+      const dest = created[0];
+      const tasks = await rest("GET", "job_tasks", { query: `?job_id=eq.${src.id}&select=*&order=number.asc` });
+      const taskMap = {};
+      for (const t of tasks) {
+        const nt = await rest("POST", "job_tasks", { body: {
+          job_id: dest.id,
+          title: t.title,
+          summary: t.summary,
+          number: "",
+          status: "enquiry",
+        }});
+        taskMap[t.id] = nt[0].id;
+      }
+      const mats = await rest("GET", "material_entries", { query: `?job_id=eq.${src.id}&select=*` });
+      for (const m of mats) {
+        const task_id = taskMap[m.task_id];
+        if (!task_id) continue;
+        const row = await rest("POST", "material_entries", { body: {
+          job_id: dest.id,
+          task_id,
+          catalogue_id: m.catalogue_id,
+          description: m.description,
+          qty: m.qty,
+        }});
+        await copyCosts("material_costs", "material_id", m.id, row[0].id);
+      }
+      const eqs = await rest("GET", "equipment_entries", { query: `?job_id=eq.${src.id}&select=*` });
+      for (const e of eqs) {
+        const task_id = taskMap[e.task_id];
+        if (!task_id) continue;
+        const row = await rest("POST", "equipment_entries", { body: {
+          job_id: dest.id,
+          task_id,
+          catalogue_id: e.catalogue_id,
+          description: e.description,
+          qty: e.qty,
+        }});
+        await copyCosts("equipment_costs", "equipment_id", e.id, row[0].id);
+      }
+      await loadJobs();
+      await openJob(dest.id);
+    } catch (err) {
+      $("jobError").textContent = err.message;
+      $("jobError").hidden = false;
+    }
+  }
+
   async function afterLogin(session) {
     state.session = session;
     persistSession();
@@ -840,6 +934,25 @@ const JOBS = (() => {
   });
   $("backToList").addEventListener("click", async () => { await loadJobs(); show("jobsTab"); });
   $("backToJob").addEventListener("click", () => openJob(state.currentJob.id));
+
+  $("jobStatus").addEventListener("change", async () => {
+    $("jobError").hidden = true;
+    const status = $("jobStatus").value;
+    try {
+      const rows = await rest("PATCH", "jobs", {
+        query: `?id=eq.${state.currentJob.id}`,
+        body: { status },
+      });
+      if (rows && rows[0]) state.currentJob.status = rows[0].status;
+      await loadJobs();
+    } catch (err) {
+      $("jobStatus").value = state.currentJob.status;
+      $("jobError").textContent = err.message;
+      $("jobError").hidden = false;
+    }
+  });
+
+  $("duplicateJob").addEventListener("click", duplicateJob);
   $("labourStart").addEventListener("change", updateLabourPreview);
   $("labourFinish").addEventListener("change", updateLabourPreview);
 
@@ -1094,6 +1207,6 @@ const JOBS = (() => {
   boot();
 })();
 
-  </script>
+</script>
 </body>
 </html>
