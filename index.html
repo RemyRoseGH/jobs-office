@@ -650,6 +650,7 @@ body.field .office-only { display: none !important; }
           <p class="meta office-only" id="empCardRate"></p>
           <button type="submit">Save</button>
         </form>
+        <button type="button" class="ghost office-only" id="delEmployee">Delete employee</button>
         <p class="error" id="empCardError" hidden></p>
       </div>
     </section>
@@ -1039,7 +1040,7 @@ const JOBS = (() => {
       const classRows = await rest("GET", "classification_rates", { query: "?select=*" });
       state.classRates = Object.fromEntries(classRows.map((r) => [r.classification, r]));
     }
-    $("empBody").innerHTML = state.employees.map((e) =>
+    $("empBody").innerHTML = state.employees.filter((e) => e.active !== false).map((e) =>
       `<tr data-emp="${e.id}"><td>${escapeHtml(e.name)}</td><td>${classLabel(e.classification)}</td>
        <td>${escapeHtml(e.phone || "")}</td>
        <td class="office-only">${dollars(state.chargeRates[e.id])}</td></tr>`
@@ -2559,7 +2560,7 @@ const JOBS = (() => {
           await rest("POST", "classification_rates", { body: { operator_id: state.profile.operator_id, classification: role, ...body } });
         }
         state.classRates[role] = { classification: role, ...body };
-        for (const e of state.employees.filter((x) => x.classification === role)) {
+        for (const e of state.employees.filter((x) => x.classification === role && x.active !== false)) {
           const direct = state.employeeCosts[e.id] != null ? state.employeeCosts[e.id] : cost;
           const personCharge = chargeCents(direct, overhead, profit_bps);
           const old = await rest("GET", "rate_book", { query: `?employee_id=eq.${e.id}&select=id` });
@@ -2590,6 +2591,28 @@ const JOBS = (() => {
   });
   $("backToEmployees").addEventListener("click", async () => { await loadEmployees(); show("employeesTab"); });
   $("backToEmployeesFromRates").addEventListener("click", async () => { await loadEmployees(); show("employeesTab"); });
+  $("delEmployee").addEventListener("click", async () => {
+    if (!isOffice() || !state.currentEmployee) return;
+    $("empCardError").hidden = true;
+    if (!window.confirm("Delete this person? Hours already on jobs stay.")) return;
+    try {
+      const id = state.currentEmployee.id;
+      const labour = await rest("GET", "labour_entries", { query: `?employee_id=eq.${id}&select=id&limit=1` });
+      if (labour.length) {
+        await rest("PATCH", "employees", { query: `?id=eq.${id}`, body: { active: false } });
+        await rest("DELETE", "job_allocations", { query: `?employee_id=eq.${id}` });
+      } else {
+        await rest("DELETE", "employees", { query: `?id=eq.${id}` });
+      }
+      state.currentEmployee = null;
+      await loadEmployees();
+      show("employeesTab");
+      setTab("employees");
+    } catch (err) {
+      $("empCardError").textContent = err.message;
+      $("empCardError").hidden = false;
+    }
+  });
   $("empCardForm").addEventListener("submit", async (e) => {
     e.preventDefault();
     $("empCardError").hidden = true;
