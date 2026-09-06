@@ -213,6 +213,7 @@ body.field .office-only { display: none !important; }
       <button type="button" data-tab="customers">Customers</button>
       <button type="button" data-tab="employees">Employees</button>
       <button type="button" data-tab="catalogue">Catalogue</button>
+      <button type="button" data-tab="templates" class="office-only">Templates</button>
     </nav>
     <div class="top-right" id="topRight" hidden>
       <span id="whoAmI"></span>
@@ -699,14 +700,93 @@ body.field .office-only { display: none !important; }
           </table>
         </div>
       </div>
-      <div class="card">
-        <h1>Templates</h1>
-        <p class="hint">Start a typical job. Save one from a job card.</p>
-        <p class="error" id="tmplError" hidden></p>
-        <table>
-          <thead><tr><th>Name</th><th>Job title</th></tr></thead>
+    </section>
+
+    <section id="templatesTab" hidden>
+      <div class="toolbar">
+        <input id="tmplSearch" type="search" placeholder="Search name or description" />
+        <button type="button" id="newTemplateBtn">New template</button>
+      </div>
+      <p class="hint">Typical jobs. Not the customer, site, hours, or quoted $. Duplicate a template to make a new description.</p>
+      <p class="error" id="tmplError" hidden></p>
+      <div class="jobs-scroll">
+        <table class="jobs-table">
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>Description</th>
+              <th>Type</th>
+              <th>Tasks</th>
+              <th>Materials</th>
+              <th>Equipment</th>
+            </tr>
+          </thead>
           <tbody id="tmplBody"></tbody>
         </table>
+      </div>
+    </section>
+
+    <section id="templateView" hidden>
+      <button type="button" class="link" id="backToTemplates">← Templates</button>
+      <div class="card">
+        <h1 id="tmplTitle">Template</h1>
+        <div class="row">
+          <label>Name<input id="tmplName" required /></label>
+          <label>Default job title<input id="tmplJobTitle" /></label>
+        </div>
+        <label>Description<textarea id="tmplDesc" rows="3" placeholder="What this typical job is for"></textarea></label>
+        <label>Type
+          <select id="tmplModel">
+            <option value="tm">TM</option>
+            <option value="quoted">Quoted</option>
+            <option value="measured">Measured</option>
+          </select>
+        </label>
+        <button type="button" id="saveTmpl">Save template</button>
+        <button type="button" class="ghost" id="dupTmpl">Duplicate</button>
+        <button type="button" class="ghost" id="delTmpl">Delete</button>
+        <p class="error" id="tmplEditError" hidden></p>
+      </div>
+      <div class="card">
+        <h2>Tasks</h2>
+        <ul id="tmplTaskList" class="job-list"></ul>
+        <form id="tmplTaskForm" class="inline">
+          <input id="tmplTaskTitle" placeholder="Task name" required />
+          <button type="submit">Add task</button>
+        </form>
+      </div>
+      <div class="card" id="tmplLinesCard" hidden>
+        <h2 id="tmplTaskHead">Task</h2>
+        <div class="grid">
+          <div>
+            <h2>Materials</h2>
+            <form id="tmplMatForm" class="stack">
+              <select id="tmplMatCat"><option value="">Ad-hoc</option></select>
+              <input id="tmplMatDesc" placeholder="Description" />
+              <input id="tmplMatQty" type="number" min="1" value="1" />
+              <input id="tmplMatCost" class="office-only" inputmode="decimal" placeholder="Unit cost $" />
+              <button type="submit">Add material</button>
+            </form>
+            <table>
+              <thead><tr><th>Item</th><th>Qty</th><th class="office-only">Unit</th></tr></thead>
+              <tbody id="tmplMatBody"></tbody>
+            </table>
+          </div>
+          <div>
+            <h2>Equipment</h2>
+            <form id="tmplEqForm" class="stack">
+              <select id="tmplEqCat"><option value="">Ad-hoc</option></select>
+              <input id="tmplEqDesc" placeholder="Description" />
+              <input id="tmplEqQty" type="number" min="1" value="1" />
+              <input id="tmplEqCost" class="office-only" inputmode="decimal" placeholder="Unit cost $" />
+              <button type="submit">Add equipment</button>
+            </form>
+            <table>
+              <thead><tr><th>Item</th><th>Qty</th><th class="office-only">Unit</th></tr></thead>
+              <tbody id="tmplEqBody"></tbody>
+            </table>
+          </div>
+        </div>
       </div>
     </section>
   </main>
@@ -867,7 +947,7 @@ const JOBS = (() => {
 
   const ROLE_ORDER = ["trade", "apprentice", "supervisor", "project_manager", "subcontractor"];
 
-  const views = ["loginView", "jobsTab", "jobView", "taskView", "newJobView", "customersTab", "customerView", "employeesTab", "employeeView", "ratesView", "catalogueTab"];
+  const views = ["loginView", "jobsTab", "jobView", "taskView", "newJobView", "customersTab", "customerView", "employeesTab", "employeeView", "ratesView", "catalogueTab", "templatesTab", "templateView"];
   function show(id) {
     views.forEach((v) => { const el = $(v); if (el) el.hidden = v !== id; });
   }
@@ -1010,14 +1090,51 @@ const JOBS = (() => {
     await loadTemplates();
   }
 
+  function modelLabel(s) {
+    return ({ tm: "TM", quoted: "Quoted", measured: "Measured" })[s] || s;
+  }
+
   async function loadTemplates() {
     state.templates = await rest("GET", "job_templates", { query: "?select=*&order=name.asc" });
-    $("tmplBody").innerHTML = state.templates.map((t) =>
-      `<tr><td>${escapeHtml(t.name)}</td><td>${escapeHtml(t.title)}</td></tr>`
-    ).join("") || `<tr><td colspan="2">None yet. Save as template from a job.</td></tr>`;
-    $("jobTemplate").innerHTML = `<option value="">None</option>` + state.templates.map((t) =>
-      `<option value="${t.id}">${escapeHtml(t.name)}</option>`
-    ).join("");
+    const tasks = await rest("GET", "job_template_tasks", { query: "?select=id,template_id" });
+    const lines = await rest("GET", "job_template_lines", { query: "?select=id,template_id,kind" });
+    const counts = {};
+    for (const t of state.templates) counts[t.id] = { tasks: 0, material: 0, equipment: 0 };
+    for (const t of tasks) {
+      if (!counts[t.template_id]) counts[t.template_id] = { tasks: 0, material: 0, equipment: 0 };
+      counts[t.template_id].tasks += 1;
+    }
+    for (const l of lines) {
+      if (!counts[l.template_id]) counts[l.template_id] = { tasks: 0, material: 0, equipment: 0 };
+      if (l.kind === "material") counts[l.template_id].material += 1;
+      else counts[l.template_id].equipment += 1;
+    }
+    state.tmplCounts = counts;
+    renderTemplates();
+    if ($("jobTemplate")) {
+      $("jobTemplate").innerHTML = `<option value="">None</option>` + state.templates.map((t) =>
+        `<option value="${t.id}">${escapeHtml(t.name)}</option>`
+      ).join("");
+    }
+  }
+
+  function renderTemplates() {
+    const term = ($("tmplSearch")?.value || "").trim().toLowerCase();
+    const items = state.templates.filter((t) => {
+      if (!term) return true;
+      return [t.name, t.description, t.title, modelLabel(t.model)].join(" ").toLowerCase().includes(term);
+    });
+    $("tmplBody").innerHTML = items.map((t) => {
+      const c = state.tmplCounts[t.id] || { tasks: 0, material: 0, equipment: 0 };
+      return `<tr data-id="${t.id}">
+        <td>${escapeHtml(t.name)}</td>
+        <td>${escapeHtml(t.description || "")}</td>
+        <td>${escapeHtml(modelLabel(t.model))}</td>
+        <td>${c.tasks}</td>
+        <td>${c.material}</td>
+        <td>${c.equipment}</td>
+      </tr>`;
+    }).join("") || `<tr><td colspan="6">No templates</td></tr>`;
   }
 
   async function applyTemplate(jobId, templateId) {
@@ -1057,18 +1174,28 @@ const JOBS = (() => {
     const src = state.currentJob;
     const name = window.prompt("Template name", src.title);
     if (!name) return;
+    const description = window.prompt("Template description", "") || "";
     const tmpl = await rest("POST", "job_templates", { body: {
-      name: name.trim(), title: src.title, summary: src.summary, model: src.model || "tm",
+      name: name.trim(),
+      description: description.trim() || null,
+      title: src.title,
+      model: src.model || "tm",
     }});
     const tid = tmpl[0].id;
-    const tasks = await rest("GET", "job_tasks", { query: `?job_id=eq.${src.id}&select=*&order=number.asc` });
+    await copyJobShapeToTemplate(src.id, tid);
+    await loadTemplates();
+    if (isOffice()) await openTemplate(tid);
+  }
+
+  async function copyJobShapeToTemplate(jobId, tid) {
+    const tasks = await rest("GET", "job_tasks", { query: `?job_id=eq.${jobId}&select=*&order=number.asc` });
     const taskMap = {};
     let sort = 0;
     for (const t of tasks) {
       const nt = await rest("POST", "job_template_tasks", { body: { template_id: tid, title: t.title, sort_order: sort++ } });
       taskMap[t.id] = nt[0].id;
     }
-    const mats = await rest("GET", "material_entries", { query: `?job_id=eq.${src.id}&select=*` });
+    const mats = await rest("GET", "material_entries", { query: `?job_id=eq.${jobId}&select=*` });
     for (const m of mats) {
       const task_id = taskMap[m.task_id];
       if (!task_id) continue;
@@ -1080,7 +1207,7 @@ const JOBS = (() => {
         if (costs[0]) await rest("POST", "job_template_line_costs", { body: { line_id: line[0].id, unit_cost_cents: costs[0].unit_cost_cents } });
       }
     }
-    const eqs = await rest("GET", "equipment_entries", { query: `?job_id=eq.${src.id}&select=*` });
+    const eqs = await rest("GET", "equipment_entries", { query: `?job_id=eq.${jobId}&select=*` });
     for (const m of eqs) {
       const task_id = taskMap[m.task_id];
       if (!task_id) continue;
@@ -1092,7 +1219,100 @@ const JOBS = (() => {
         if (costs[0]) await rest("POST", "job_template_line_costs", { body: { line_id: line[0].id, unit_cost_cents: costs[0].unit_cost_cents } });
       }
     }
+  }
+
+  async function openTemplate(id) {
+    const rows = await rest("GET", "job_templates", { query: `?id=eq.${id}&select=*` });
+    state.currentTemplate = rows[0];
+    if (!state.currentTemplate) return;
+    $("tmplTitle").textContent = state.currentTemplate.name;
+    $("tmplName").value = state.currentTemplate.name;
+    $("tmplDesc").value = state.currentTemplate.description || "";
+    $("tmplJobTitle").value = state.currentTemplate.title || "";
+    $("tmplModel").value = state.currentTemplate.model || "tm";
+    $("tmplEditError").hidden = true;
+    state.currentTmplTask = null;
+    $("tmplLinesCard").hidden = true;
+    await loadTmplTasks();
+    if (!state.materialCat.length) await loadCatalogue();
+    fillTmplCats();
+    show("templateView");
+    setTab("templates");
+  }
+
+  function fillTmplCats() {
+    $("tmplMatCat").innerHTML = `<option value="">Ad-hoc</option>` + state.materialCat.map((r) =>
+      `<option value="${r.id}" data-name="${escapeHtml(r.name)}">${escapeHtml(r.name)}</option>`
+    ).join("");
+    $("tmplEqCat").innerHTML = `<option value="">Ad-hoc</option>` + state.equipmentCat.map((r) =>
+      `<option value="${r.id}" data-name="${escapeHtml(r.name)}">${escapeHtml(r.name)}</option>`
+    ).join("");
+  }
+
+  async function loadTmplTasks() {
+    const tasks = await rest("GET", "job_template_tasks", {
+      query: `?template_id=eq.${state.currentTemplate.id}&select=*&order=sort_order.asc`,
+    });
+    $("tmplTaskList").innerHTML = tasks.map((t) => `<li data-id="${t.id}">
+      <strong>${escapeHtml(t.title)}</strong>
+    </li>`).join("") || `<li>No tasks</li>`;
+  }
+
+  async function loadTmplLines() {
+    const tid = state.currentTmplTask.id;
+    const lines = await rest("GET", "job_template_lines", { query: `?task_id=eq.${tid}&select=*&order=created_at.asc` });
+    let costs = {};
+    if (isOffice() && lines.length) {
+      const ids = lines.map((l) => l.id);
+      const rows = await rest("GET", "job_template_line_costs", { query: `?line_id=in.(${ids.join(",")})&select=*` });
+      costs = Object.fromEntries(rows.map((r) => [r.line_id, r.unit_cost_cents]));
+    }
+    const mats = lines.filter((l) => l.kind === "material");
+    const eqs = lines.filter((l) => l.kind === "equipment");
+    $("tmplMatBody").innerHTML = mats.map((r) =>
+      `<tr><td>${escapeHtml(r.description)}</td><td>${r.qty}</td><td class="office-only">${dollars(costs[r.id])}</td></tr>`
+    ).join("");
+    $("tmplEqBody").innerHTML = eqs.map((r) =>
+      `<tr><td>${escapeHtml(r.description)}</td><td>${r.qty}</td><td class="office-only">${dollars(costs[r.id])}</td></tr>`
+    ).join("");
+  }
+
+  async function duplicateTemplate() {
+    const src = state.currentTemplate;
+    const name = window.prompt("New template name", `${src.name} copy`);
+    if (!name) return;
+    const description = window.prompt("New description", src.description || "") || "";
+    const created = await rest("POST", "job_templates", { body: {
+      name: name.trim(),
+      description: description.trim() || null,
+      title: src.title,
+      model: src.model,
+    }});
+    const nid = created[0].id;
+    const tasks = await rest("GET", "job_template_tasks", { query: `?template_id=eq.${src.id}&select=*&order=sort_order.asc` });
+    const lines = await rest("GET", "job_template_lines", { query: `?template_id=eq.${src.id}&select=*` });
+    let costs = {};
+    if (isOffice() && lines.length) {
+      const rows = await rest("GET", "job_template_line_costs", { query: `?line_id=in.(${lines.map((l) => l.id).join(",")})&select=*` });
+      costs = Object.fromEntries(rows.map((r) => [r.line_id, r.unit_cost_cents]));
+    }
+    const taskMap = {};
+    for (const t of tasks) {
+      const nt = await rest("POST", "job_template_tasks", { body: { template_id: nid, title: t.title, sort_order: t.sort_order } });
+      taskMap[t.id] = nt[0].id;
+    }
+    for (const line of lines) {
+      const task_id = taskMap[line.task_id];
+      if (!task_id) continue;
+      const nl = await rest("POST", "job_template_lines", { body: {
+        template_id: nid, task_id, kind: line.kind, description: line.description, qty: line.qty,
+      }});
+      if (isOffice() && costs[line.id] != null) {
+        await rest("POST", "job_template_line_costs", { body: { line_id: nl[0].id, unit_cost_cents: costs[line.id] } });
+      }
+    }
     await loadTemplates();
+    await openTemplate(nid);
   }
 
   function sortJobs(items) {
@@ -1909,6 +2129,7 @@ const JOBS = (() => {
       if (tab === "customers") { await loadCustomers(); show("customersTab"); }
       if (tab === "employees") { await loadEmployees(); show("employeesTab"); }
       if (tab === "catalogue") { await loadCatalogue(); show("catalogueTab"); }
+      if (tab === "templates") { await loadTemplates(); show("templatesTab"); setTab("templates"); }
     });
   });
 
@@ -2069,6 +2290,139 @@ const JOBS = (() => {
     $("jobError").hidden = true;
     try { await saveAsTemplate(); }
     catch (err) { $("jobError").textContent = err.message; $("jobError").hidden = false; }
+  });
+  $("tmplSearch").addEventListener("input", renderTemplates);
+  $("tmplBody").addEventListener("click", (e) => {
+    const row = e.target.closest("tr[data-id]");
+    if (row) openTemplate(row.dataset.id);
+  });
+  $("backToTemplates").addEventListener("click", async () => {
+    await loadTemplates();
+    show("templatesTab");
+    setTab("templates");
+  });
+  $("newTemplateBtn").addEventListener("click", async () => {
+    $("tmplError").hidden = true;
+    try {
+      const created = await rest("POST", "job_templates", { body: {
+        name: "New template",
+        description: null,
+        title: "New job",
+        model: "tm",
+      }});
+      await loadTemplates();
+      await openTemplate(created[0].id);
+    } catch (err) {
+      $("tmplError").textContent = err.message;
+      $("tmplError").hidden = false;
+    }
+  });
+  $("saveTmpl").addEventListener("click", async () => {
+    $("tmplEditError").hidden = true;
+    try {
+      const name = $("tmplName").value.trim();
+      if (!name) throw new Error("Name required");
+      const rows = await rest("PATCH", "job_templates", {
+        query: `?id=eq.${state.currentTemplate.id}`,
+        body: {
+          name,
+          description: $("tmplDesc").value.trim() || null,
+          title: $("tmplJobTitle").value.trim() || name,
+          model: $("tmplModel").value,
+        },
+      });
+      if (rows[0]) state.currentTemplate = rows[0];
+      $("tmplTitle").textContent = name;
+    } catch (err) {
+      $("tmplEditError").textContent = err.message;
+      $("tmplEditError").hidden = false;
+    }
+  });
+  $("dupTmpl").addEventListener("click", async () => {
+    try { await duplicateTemplate(); }
+    catch (err) { $("tmplEditError").textContent = err.message; $("tmplEditError").hidden = false; }
+  });
+  $("delTmpl").addEventListener("click", async () => {
+    if (!window.confirm("Delete this template? Jobs already created from it stay.")) return;
+    try {
+      await rest("DELETE", "job_templates", { query: `?id=eq.${state.currentTemplate.id}` });
+      await loadTemplates();
+      show("templatesTab");
+      setTab("templates");
+    } catch (err) {
+      $("tmplEditError").textContent = err.message;
+      $("tmplEditError").hidden = false;
+    }
+  });
+  $("tmplTaskForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    try {
+      await rest("POST", "job_template_tasks", { body: {
+        template_id: state.currentTemplate.id,
+        title: $("tmplTaskTitle").value.trim(),
+        sort_order: 0,
+      }});
+      $("tmplTaskTitle").value = "";
+      await loadTmplTasks();
+    } catch (err) {
+      $("tmplEditError").textContent = err.message;
+      $("tmplEditError").hidden = false;
+    }
+  });
+  $("tmplTaskList").addEventListener("click", async (e) => {
+    const li = e.target.closest("li[data-id]");
+    if (!li) return;
+    const tasks = await rest("GET", "job_template_tasks", { query: `?id=eq.${li.dataset.id}&select=*` });
+    state.currentTmplTask = tasks[0];
+    $("tmplTaskHead").textContent = state.currentTmplTask.title;
+    $("tmplLinesCard").hidden = false;
+    await loadTmplLines();
+  });
+  async function addTmplLine(kind) {
+    const isMat = kind === "material";
+    const cat = $(isMat ? "tmplMatCat" : "tmplEqCat");
+    const opt = cat.selectedOptions[0];
+    const desc = $(isMat ? "tmplMatDesc" : "tmplEqDesc").value.trim() || opt?.dataset.name || "";
+    if (!desc) throw new Error("Description required");
+    const qty = Number($(isMat ? "tmplMatQty" : "tmplEqQty").value) || 1;
+    const line = await rest("POST", "job_template_lines", { body: {
+      template_id: state.currentTemplate.id,
+      task_id: state.currentTmplTask.id,
+      kind,
+      description: desc,
+      qty,
+    }});
+    const costText = $(isMat ? "tmplMatCost" : "tmplEqCost").value;
+    if (isOffice() && costText) {
+      await rest("POST", "job_template_line_costs", { body: { line_id: line[0].id, unit_cost_cents: toCents(costText) } });
+    }
+    $(isMat ? "tmplMatDesc" : "tmplEqDesc").value = "";
+    await loadTmplLines();
+  }
+  $("tmplMatForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    try { await addTmplLine("material"); }
+    catch (err) { $("tmplEditError").textContent = err.message; $("tmplEditError").hidden = false; }
+  });
+  $("tmplEqForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    try { await addTmplLine("equipment"); }
+    catch (err) { $("tmplEditError").textContent = err.message; $("tmplEditError").hidden = false; }
+  });
+  $("tmplMatCat").addEventListener("change", () => {
+    const opt = $("tmplMatCat").selectedOptions[0];
+    if (opt?.dataset.name) $("tmplMatDesc").value = opt.dataset.name;
+  });
+  $("tmplEqCat").addEventListener("change", () => {
+    const opt = $("tmplEqCat").selectedOptions[0];
+    if (opt?.dataset.name) $("tmplEqDesc").value = opt.dataset.name;
+  });
+  $("jobTemplate").addEventListener("change", () => {
+    const t = state.templates.find((x) => x.id === $("jobTemplate").value);
+    if (!t) return;
+    if (!$("newTitle").value) $("newTitle").value = t.title || t.name;
+    $("newModel").value = t.model || "tm";
+    $("newQuoted").value = "";
   });
   $("jobModel").addEventListener("change", async () => {
     try { await patchJob({ model: $("jobModel").value }); }
