@@ -122,6 +122,10 @@ button.ghost {
   color: var(--accent);
   border: 1px solid var(--line);
 }
+button.ghost#deleteJob {
+  color: var(--danger);
+  border-color: var(--danger);
+}
 button.ghost.on { background: var(--accent); color: #fff; border-color: var(--accent); }
 .job-list { list-style: none; padding: 0; margin: 0; }
 .job-list li {
@@ -289,6 +293,14 @@ body.field .office-only { display: none !important; }
       <button type="button" class="link" id="backToList">← Jobs</button>
       <div class="job-head">
         <h1 id="jobTitle"></h1>
+        <div class="row">
+          <label>Job name
+            <input id="jobName" />
+          </label>
+          <label>Description
+            <input id="jobSummary" placeholder="Overall project" />
+          </label>
+        </div>
         <div class="job-actions">
           <label>Status
             <select id="jobStatus">
@@ -314,8 +326,10 @@ body.field .office-only { display: none !important; }
           <label class="office-only">Quoted $
             <input id="jobQuoted" inputmode="decimal" placeholder="0.00" />
           </label>
+          <button type="button" class="ghost" id="saveJob">Save job</button>
           <button type="button" class="ghost" id="duplicateJob">Duplicate job</button>
           <button type="button" class="ghost" id="saveTemplate">Save as template</button>
+          <button type="button" class="ghost office-only" id="deleteJob">Delete job</button>
         </div>
         <p class="meta" id="jobPhone"></p>
         <p class="meta" id="jobSiteContact"></p>
@@ -1764,6 +1778,8 @@ const JOBS = (() => {
     state.currentJob = job[0];
     if (!state.currentJob) return;
     $("jobTitle").textContent = `${state.currentJob.number} · ${state.currentJob.title}`;
+    $("jobName").value = state.currentJob.title || "";
+    $("jobSummary").value = state.currentJob.summary || "";
     $("jobStatus").value = state.currentJob.status;
     $("jobScheduled").value = state.currentJob.scheduled_on || "";
     $("crewDate").value = state.currentJob.scheduled_on || isoDate(new Date());
@@ -2286,6 +2302,43 @@ const JOBS = (() => {
     }
   });
 
+  $("saveJob").addEventListener("click", async () => {
+    $("jobError").hidden = true;
+    try {
+      const title = $("jobName").value.trim();
+      if (!title) throw new Error("Job name required");
+      await patchJob({ title, summary: $("jobSummary").value.trim() || null });
+      await loadJobs();
+      $("jobTitle").textContent = `${state.currentJob.number} · ${state.currentJob.title}`;
+    } catch (err) {
+      $("jobError").textContent = err.message;
+      $("jobError").hidden = false;
+    }
+  });
+  $("deleteJob").addEventListener("click", async () => {
+    if (!isOffice() || !state.currentJob) return;
+    $("jobError").hidden = true;
+    if (!window.confirm("Delete this job? Hours, photos and pack on it go with it.")) return;
+    try {
+      const jid = state.currentJob.id;
+      const photos = await rest("GET", "job_photos", { query: `?job_id=eq.${jid}&select=storage_path` });
+      for (const p of photos) {
+        if (!p.storage_path) continue;
+        await fetch(`${CONFIG.url}/storage/v1/object/job-photos/${p.storage_path}`, {
+          method: "DELETE",
+          headers: headers(),
+        });
+      }
+      await rest("DELETE", "jobs", { query: `?id=eq.${jid}` });
+      state.currentJob = null;
+      await loadJobs();
+      setJobsView("list");
+      show("jobsTab");
+    } catch (err) {
+      $("jobError").textContent = err.message;
+      $("jobError").hidden = false;
+    }
+  });
   $("duplicateJob").addEventListener("click", duplicateJob);
   $("saveTemplate").addEventListener("click", async () => {
     $("jobError").hidden = true;
