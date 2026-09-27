@@ -201,11 +201,32 @@ body.field .office-only { display: none !important; }
 .photos { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0; }
 .photos img { width: 120px; height: 120px; object-fit: cover; border-radius: 8px; border: 1px solid var(--line); }
 #printRun { display: none; }
+.open-line { display: block; margin: 6px 0; font-size: 14px; }
+.open-line .line-price { width: 90px; margin-left: 8px; }
+.paper-rule { height: 4px; margin: 12px 0 16px; }
+.paper-top { display: flex; justify-content: space-between; gap: 24px; }
+.paper-logo { font-weight: 700; letter-spacing: 0.04em; margin-bottom: 8px; }
+.paper-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 12px; }
+.paper-meta { display: flex; flex-wrap: wrap; gap: 16px; margin: 12px 0 20px; }
+.paper-meta span { display: block; color: var(--muted); font-size: 12px; }
+.paper-lines { width: 100%; border-collapse: collapse; }
+.paper-lines th, .paper-lines td { border-bottom: 1px solid var(--line); padding: 8px 6px; vertical-align: top; text-align: left; }
+.paper-title { font-weight: 650; }
+.paper-desc { color: var(--muted); font-size: 13px; white-space: pre-wrap; }
+.paper-totals { margin: 16px 0 0 auto; width: 280px; }
+.paper-totals div, .paper-run { display: flex; justify-content: space-between; margin: 4px 0; }
+.paper-totals .grand { font-weight: 700; margin-top: 8px; }
+.paper-pay { margin-top: 28px; font-size: 14px; }
+#paperSheet { display: none; }
 @media print {
-  header, nav, .toolbar, .chips, #loginView, #jobsListPane, #weekView, #weekBar, #invoiceView, #jobView, #taskView, #newJobView, #customersTab, #customerView, #employeesTab, #catalogueTab, #listError, #quickFilters { display: none !important; }
-  #printRun { display: block !important; }
+  header, nav, .toolbar, .chips, #loginView, #jobsListPane, #weekView, #weekBar, #invoiceView, #openInvoicesView, #jobView, #taskView, #newJobView, #customersTab, #customerView, #employeesTab, #catalogueTab, #quotesTab, #quoteView, #claimView, #newQuoteView, #templatesTab, #templateView, #listError, #quickFilters { display: none !important; }
+  body:not(.print-paper) #printRun { display: block !important; }
+  body.print-paper #printRun { display: none !important; }
+  body.print-paper #paperSheet { display: block !important; }
   main { max-width: none; margin: 0; }
+  #paperSheet { background: #fff; }
 }
+
 
 </style>
 </head>
@@ -214,6 +235,7 @@ body.field .office-only { display: none !important; }
     <div class="brand" id="brand">Jobs</div>
     <nav id="nav" hidden>
       <button type="button" data-tab="jobs" class="on">Jobs</button>
+      <button type="button" data-tab="quotes" class="office-only">Quotes</button>
       <button type="button" data-tab="customers">Customers</button>
       <button type="button" data-tab="employees">Employees</button>
       <button type="button" data-tab="catalogue">Catalogue</button>
@@ -253,6 +275,7 @@ body.field .office-only { display: none !important; }
         <button type="button" class="ghost on" id="listViewBtn">List</button>
         <button type="button" class="ghost" id="weekViewBtn">Week</button>
         <button type="button" class="ghost" id="invoiceViewBtn">To invoice</button>
+        <button type="button" class="ghost office-only" id="openInvoicesBtn">Open invoices</button>
       </div>
       <div class="chips" id="quickFilters">
         <button type="button" data-quick="" class="on">All</button>
@@ -269,6 +292,7 @@ body.field .office-only { display: none !important; }
       </div>
       <div id="weekView" hidden></div>
       <div id="invoiceView" hidden></div>
+      <div id="openInvoicesView" hidden></div>
       <div id="printRun" hidden></div>
       <div id="listError" class="error" hidden></div>
       <div class="jobs-scroll" id="jobsListPane">
@@ -329,6 +353,7 @@ body.field .office-only { display: none !important; }
           <button type="button" class="ghost" id="saveJob">Save job</button>
           <button type="button" class="ghost" id="duplicateJob">Duplicate job</button>
           <button type="button" class="ghost" id="saveTemplate">Save as template</button>
+          <button type="button" class="ghost office-only" id="quoteOnJob">Quote this job</button>
           <button type="button" class="ghost office-only" id="deleteJob">Delete job</button>
         </div>
         <p class="meta" id="jobPhone"></p>
@@ -376,7 +401,9 @@ body.field .office-only { display: none !important; }
         <div id="photoList" class="photos"></div>
         <p class="error" id="photoError" hidden></p>
         <h2>Variations</h2>
+        <p class="hint office-only">Pending sits here, not in open lines. It does not freeze other claims.</p>
         <form id="variationForm" class="inline">
+          <input id="varTitle" class="office-only" placeholder="Title" />
           <input id="varDesc" placeholder="What changed" required />
           <input id="varAmount" class="office-only" inputmode="decimal" placeholder="Amount $" />
           <button type="submit">Add variation</button>
@@ -387,6 +414,28 @@ body.field .office-only { display: none !important; }
           <tbody id="varBody"></tbody>
         </table>
       </div>
+      <div class="card office-only" id="claimCard">
+        <h2>Open lines</h2>
+        <p class="hint">Labour, materials and plant not on a claim. Tick what to bill, or take a portion of a task or variation.</p>
+        <div id="openLines"></div>
+        <h2>Portion</h2>
+        <form id="portionForm" class="inline">
+          <select id="portionTarget"></select>
+          <input id="portionPct" inputmode="decimal" placeholder="50" />
+          <span class="meta">%</span>
+          <button type="submit">Add portion to claim</button>
+        </form>
+        <form id="claimForm" class="inline">
+          <input id="claimTitle" placeholder="Claim 1" />
+          <button type="submit">Make a claim</button>
+        </form>
+        <p class="error" id="claimError" hidden></p>
+        <h2>Claims</h2>
+        <table>
+          <thead><tr><th>Number</th><th>Name</th><th>Status</th><th>Amount</th><th></th></tr></thead>
+          <tbody id="claimBody"></tbody>
+        </table>
+      </div>
       <div class="card">
         <h2>Notes</h2>
         <textarea id="jobNotes" rows="4" placeholder="What happened on site. Stays on this job."></textarea>
@@ -394,7 +443,7 @@ body.field .office-only { display: none !important; }
       </div>
       <div class="card" id="jobSummary">
         <h2>Job summary</h2>
-        <p class="hint">For invoicing. Everything on this job, all tasks.</p>
+        <p class="hint">Internal picture. Client paper is a quote or a claim.</p>
         <p class="meta" id="summaryHours"></p>
         <p class="meta office-only" id="jobMoney"></p>
         <table>
@@ -741,6 +790,148 @@ body.field .office-only { display: none !important; }
       </div>
     </section>
 
+    <section id="quotesTab" hidden>
+      <div class="toolbar">
+        <input id="quoteSearch" type="search" placeholder="Search number, job, customer" />
+        <select id="quoteStatusFilter">
+          <option value="">All quotes</option>
+          <option value="draft">Draft</option>
+          <option value="sent">Sent</option>
+          <option value="accepted">Accepted</option>
+          <option value="declined">Declined</option>
+        </select>
+        <button type="button" id="newQuoteBtn">New quote</button>
+      </div>
+      <div id="quoteListError" class="error" hidden></div>
+      <div class="jobs-scroll">
+        <table class="jobs-table">
+          <thead>
+            <tr>
+              <th>Number</th>
+              <th>Job</th>
+              <th>Customer</th>
+              <th>Status</th>
+              <th>Amount</th>
+              <th>Expiry</th>
+            </tr>
+          </thead>
+          <tbody id="quoteList"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="newQuoteView" hidden>
+      <button type="button" class="link" id="cancelNewQuote">← Quotes</button>
+      <div class="card narrow">
+        <h1>New quote</h1>
+        <form id="newQuoteForm">
+          <label>Project name<input id="nqTitle" required /></label>
+          <label>Customer
+            <input id="nqCustomer" list="customerOptions" autocomplete="off" required />
+          </label>
+          <label>Site address
+            <input id="nqSite" list="nqSiteOptions" autocomplete="off" placeholder="Street, suburb" />
+            <datalist id="nqSiteOptions"></datalist>
+          </label>
+          <label>Template
+            <select id="nqTemplate"><option value="">None</option></select>
+          </label>
+          <label>Type
+            <select id="nqModel">
+              <option value="quoted">Quoted</option>
+              <option value="tm">TM</option>
+              <option value="measured">Measured</option>
+            </select>
+          </label>
+          <p class="error" id="nqError" hidden></p>
+          <button type="submit">Create quote</button>
+        </form>
+      </div>
+    </section>
+
+    <section id="quoteView" hidden>
+      <button type="button" class="link" id="backToQuotes">← Quotes</button>
+      <div class="job-head">
+        <h1 id="quoteHead"></h1>
+        <p class="meta" id="quoteMeta"></p>
+        <div class="job-actions">
+          <label>Status
+            <select id="quoteStatus">
+              <option value="draft">Draft</option>
+              <option value="sent">Sent</option>
+              <option value="accepted">Accepted</option>
+              <option value="declined">Declined</option>
+            </select>
+          </label>
+          <label>Expiry<input id="quoteExpiry" type="date" /></label>
+          <button type="button" class="ghost" id="saveQuote">Save quote</button>
+          <button type="button" class="ghost" id="dupQuote">Duplicate</button>
+          <button type="button" class="ghost" id="delQuote">Delete</button>
+          <button type="button" id="exportQuotePdf">Export PDF</button>
+          <button type="button" class="ghost" id="openQuoteJob">Open job</button>
+        </div>
+        <p class="error" id="quoteError" hidden></p>
+      </div>
+      <div class="card">
+        <h2>Lines</h2>
+        <p class="hint">Title plus scope underneath. Quantity 1 for a lump, like the paper you already send.</p>
+        <form id="quoteLineForm" class="stack">
+          <input id="qlTitle" placeholder="Title" required />
+          <textarea id="qlDesc" rows="3" placeholder="Scope notes"></textarea>
+          <div class="row">
+            <label>Qty<input id="qlQty" type="number" min="1" value="1" required /></label>
+            <label>Price $<input id="qlPrice" inputmode="decimal" placeholder="0.00" /></label>
+          </div>
+          <button type="submit">Add line</button>
+        </form>
+        <table>
+          <thead><tr><th>Description</th><th>Qty</th><th>Price</th><th>Amount</th><th></th></tr></thead>
+          <tbody id="quoteLineBody"></tbody>
+        </table>
+        <p class="meta" id="quoteTotals"></p>
+      </div>
+    </section>
+
+    <section id="claimView" hidden>
+      <button type="button" class="link" id="backToClaimJob">← Job</button>
+      <div class="job-head">
+        <h1 id="claimHead"></h1>
+        <p class="meta" id="claimMeta"></p>
+        <div class="job-actions">
+          <button type="button" class="ghost" id="issueClaim">Issue invoice</button>
+          <button type="button" id="exportClaimPdf">Export PDF</button>
+          <button type="button" class="ghost" id="delClaim">Delete draft</button>
+        </div>
+        <p class="error" id="claimViewError" hidden></p>
+      </div>
+      <div class="card">
+        <h2>Invoice lines</h2>
+        <table>
+          <thead><tr><th>Description</th><th>Qty</th><th>Price</th><th>Amount</th></tr></thead>
+          <tbody id="claimLineBody"></tbody>
+        </table>
+        <p class="meta" id="claimTotals"></p>
+      </div>
+      <div class="card" id="payCard">
+        <h2>Payments</h2>
+        <p class="hint">Sits in open invoices until fully paid. You cannot mark paid early.</p>
+        <form id="payForm" class="inline">
+          <input id="payAmount" inputmode="decimal" placeholder="Amount $" required />
+          <input id="payDate" type="date" required />
+          <input id="payRef" placeholder="Reference" />
+          <button type="submit">Record payment</button>
+        </form>
+        <p class="error" id="payError" hidden></p>
+        <table>
+          <thead><tr><th>Date</th><th>Amount</th><th>Reference</th></tr></thead>
+          <tbody id="payBody"></tbody>
+        </table>
+        <p class="meta" id="payStatus"></p>
+      </div>
+    </section>
+
+    <section id="paperSheet" hidden></section>
+
     <section id="templateView" hidden>
       <button type="button" class="link" id="backToTemplates">← Templates</button>
       <div class="card">
@@ -962,7 +1153,7 @@ const JOBS = (() => {
 
   const ROLE_ORDER = ["trade", "apprentice", "supervisor", "project_manager", "subcontractor"];
 
-  const views = ["loginView", "jobsTab", "jobView", "taskView", "newJobView", "customersTab", "customerView", "employeesTab", "employeeView", "ratesView", "catalogueTab", "templatesTab", "templateView"];
+  const views = ["loginView", "jobsTab", "jobView", "taskView", "newJobView", "customersTab", "customerView", "employeesTab", "employeeView", "ratesView", "catalogueTab", "templatesTab", "templateView", "quotesTab", "newQuoteView", "quoteView", "claimView", "paperSheet"];
   function show(id) {
     views.forEach((v) => { const el = $(v); if (el) el.hidden = v !== id; });
   }
@@ -1390,11 +1581,13 @@ const JOBS = (() => {
     $("listViewBtn").classList.toggle("on", mode === "list");
     $("weekViewBtn").classList.toggle("on", week);
     $("invoiceViewBtn").classList.toggle("on", invoice);
+    if ($("openInvoicesBtn")) $("openInvoicesBtn").classList.toggle("on", false);
     $("jobsListPane").hidden = mode !== "list";
     $("quickFilters").hidden = mode !== "list";
     $("weekBar").hidden = !week;
     $("weekView").hidden = !week;
     $("invoiceView").hidden = !invoice;
+    if ($("openInvoicesView")) $("openInvoicesView").hidden = true;
     if (week) renderWeek();
     if (invoice) renderInvoiceList();
   }
@@ -1639,10 +1832,10 @@ const JOBS = (() => {
       `<label><input type="checkbox" data-check="${c.id}" ${c.done ? "checked" : ""} /> ${escapeHtml(c.label)}</label>`
     ).join("") || `<p class="meta">No checks.</p>`;
     $("varBody").innerHTML = vars.map((v) => `<tr data-var="${v.id}">
-      <td>${escapeHtml(v.description)}</td>
+      <td>${escapeHtml(v.title ? `${v.title} — ${v.description}` : v.description)}</td>
       <td>${escapeHtml(v.status)}</td>
       <td class="office-only">${dollars(amounts[v.id])}</td>
-      <td>${v.status === "pending" ? `<button type="button" class="ghost" data-accept="${v.id}">Accept</button> <button type="button" class="ghost" data-decline="${v.id}">Decline</button>` : ""}</td>
+      <td>${v.status === "pending" ? `<button type="button" class="ghost" data-accept-task="${v.id}">Add as task</button> <button type="button" class="ghost" data-accept-job="${v.id}">New job</button> <button type="button" class="ghost" data-decline="${v.id}">Decline</button>` : ""}</td>
     </tr>`).join("") || `<tr><td colspan="4">No variations</td></tr>`;
     const imgs = [];
     for (const p of photos) {
@@ -1796,6 +1989,7 @@ const JOBS = (() => {
     await loadTasks();
     if (isOffice() && !Object.keys(state.classRates || {}).length) await loadEmployees();
     await loadJobSummary();
+    if (window.JOBS_API?.refreshMoney) await window.JOBS_API.refreshMoney();
     show("jobView");
     setTab("jobs");
   }
@@ -2147,6 +2341,7 @@ const JOBS = (() => {
       if (tab === "employees") { await loadEmployees(); show("employeesTab"); }
       if (tab === "catalogue") { await loadCatalogue(); show("catalogueTab"); }
       if (tab === "templates") { await loadTemplates(); show("templatesTab"); setTab("templates"); }
+      if (tab === "quotes" && window.JOBS_API?.openQuotesTab) await window.JOBS_API.openQuotesTab();
     });
   });
 
@@ -2522,6 +2717,7 @@ const JOBS = (() => {
     try {
       const created = await rest("POST", "job_variations", { body: {
         job_id: state.currentJob.id,
+        title: ($("varTitle")?.value || "").trim() || null,
         description: $("varDesc").value.trim(),
         status: "pending",
       }});
@@ -2532,6 +2728,7 @@ const JOBS = (() => {
         }});
       }
       $("varDesc").value = "";
+      if ($("varTitle")) $("varTitle").value = "";
       $("varAmount").value = "";
       await loadPack();
     } catch (err) {
@@ -2540,12 +2737,26 @@ const JOBS = (() => {
     }
   });
   $("varBody").addEventListener("click", async (e) => {
-    const accept = e.target.closest("[data-accept]");
+    const acceptTask = e.target.closest("[data-accept-task]");
+    const acceptJob = e.target.closest("[data-accept-job]");
     const decline = e.target.closest("[data-decline]");
-    const id = accept?.dataset.accept || decline?.dataset.decline;
+    const id = acceptTask?.dataset.acceptTask || acceptJob?.dataset.acceptJob || decline?.dataset.decline;
     if (!id) return;
-    await rest("PATCH", "job_variations", { query: `?id=eq.${id}`, body: { status: accept ? "accepted" : "declined" } });
-    await loadPack();
+    try {
+      if (decline) {
+        await rest("PATCH", "job_variations", { query: `?id=eq.${id}`, body: { status: "declined" } });
+      } else if (window.JOBS_API?.acceptVariationAs) {
+        await window.JOBS_API.acceptVariationAs(id, Boolean(acceptTask));
+      } else {
+        await rest("PATCH", "job_variations", { query: `?id=eq.${id}`, body: { status: "accepted" } });
+      }
+      await loadPack();
+      await loadTasks();
+      if (window.JOBS_API?.refreshMoney) await window.JOBS_API.refreshMoney();
+    } catch (err) {
+      $("varError").textContent = err.message;
+      $("varError").hidden = false;
+    }
   });
   $("invoiceViewBtn").addEventListener("click", async () => {
     await loadJobs();
@@ -2986,8 +3197,934 @@ const JOBS = (() => {
     }
   }
 
+  window.JOBS_API = {
+    state, rest, $, isOffice, show, setTab, views, dollars, toCents, escapeHtml,
+    isoDate, loadJobs, openJob, loadPack, loadJobSummary, loadTasks, loadCustomers,
+    loadTemplates, ensureSite, findCustomerByName, ensureCustomer, hhmm,
+    applyTemplate, personChargeCents, centsFromMinutes, statusLabel,
+  };
+
   boot();
 })();
+
+window.JobsMoney = function JobsMoney(api) {
+  const {
+    state, rest, $, isOffice, show, setTab, views, dollars, toCents, escapeHtml,
+    isoDate, loadJobs, openJob, loadPack, loadJobSummary, loadTasks, loadCustomers,
+    loadTemplates, ensureSite, findCustomerByName, ensureCustomer, hhmm,
+    applyTemplate, personChargeCents, centsFromMinutes,
+  } = api;
+
+  ["quotesTab", "newQuoteView", "quoteView", "claimView", "paperSheet"].forEach((id) => {
+    if (!views.includes(id)) views.push(id);
+  });
+
+  state.quotes = [];
+  state.currentQuote = null;
+  state.quoteLines = [];
+  state.currentClaim = null;
+  state.paper = null;
+  state.pendingPortions = [];
+
+  function gstOn(ex) {
+    return Math.round((Number(ex) || 0) * 10 / 100);
+  }
+
+  function lineEx(row) {
+    return (Number(row.qty) || 0) * (Number(row.unit_amount_cents) || 0);
+  }
+
+  function quoteStatusLabel(s) {
+    return ({ draft: "Draft", sent: "Sent", accepted: "Accepted", declined: "Declined" })[s] || s;
+  }
+
+  function claimPaidLabel(claim, ex, paid) {
+    const due = ex + gstOn(ex);
+    if (claim.status !== "issued") return "Draft";
+    if (paid >= due && due > 0) return "Paid";
+    if (paid > 0) return "Part paid";
+    return "Open";
+  }
+
+  function addDaysIso(iso, days) {
+    const [y, m, d] = String(iso).split("-").map(Number);
+    const dt = new Date(y, m - 1, d);
+    dt.setDate(dt.getDate() + days);
+    return isoDate(dt);
+  }
+
+  async function loadPaper() {
+    if (!isOffice()) return;
+    const rows = await rest("GET", "operator_paper", { query: "?select=*" });
+    state.paper = rows[0] || null;
+  }
+
+  async function loadQuotes() {
+    if (!isOffice()) return;
+    state.quotes = await rest("GET", "quotes", {
+      query: "?select=*,jobs(id,number,title,customer_id,site_id,customers(name),sites(address,label))&order=created_at.desc",
+    });
+    const ids = state.quotes.map((q) => q.id);
+    let lines = [];
+    if (ids.length) {
+      lines = await rest("GET", "quote_lines", { query: `?quote_id=in.(${ids.join(",")})&select=quote_id,qty,unit_amount_cents` });
+    }
+    const totals = {};
+    for (const l of lines) totals[l.quote_id] = (totals[l.quote_id] || 0) + lineEx(l);
+    const q = ($("quoteSearch")?.value || "").trim().toLowerCase();
+    const st = $("quoteStatusFilter")?.value || "";
+    const rows = state.quotes.filter((x) => {
+      if (st && x.status !== st) return false;
+      if (!q) return true;
+      const blob = [x.number, x.jobs?.title, x.jobs?.customers?.name].join(" ").toLowerCase();
+      return blob.includes(q);
+    });
+    $("quoteList").innerHTML = rows.map((x) => `<tr data-qid="${x.id}">
+      <td class="num">${escapeHtml(x.number)}</td>
+      <td>${escapeHtml(x.jobs?.title || "")}</td>
+      <td>${escapeHtml(x.jobs?.customers?.name || "")}</td>
+      <td>${escapeHtml(quoteStatusLabel(x.status))}</td>
+      <td>$${dollars(totals[x.id] || 0)}</td>
+      <td>${escapeHtml(x.expires_on || "")}</td>
+    </tr>`).join("") || `<tr><td colspan="6">No quotes</td></tr>`;
+  }
+
+  async function openQuote(id) {
+    const rows = await rest("GET", "quotes", {
+      query: `?id=eq.${id}&select=*,jobs(id,number,title,customer_id,site_id,customers(name,company,phone,email,postal_address),sites(address,label))`,
+    });
+    state.currentQuote = rows[0];
+    if (!state.currentQuote) return;
+    await loadQuoteLines();
+    const q = state.currentQuote;
+    $("quoteHead").textContent = `${q.number} · ${q.jobs?.title || ""}`;
+    $("quoteMeta").textContent = [q.jobs?.customers?.name, q.jobs?.sites?.address, q.jobs?.number].filter(Boolean).join(" · ");
+    $("quoteStatus").value = q.status;
+    $("quoteExpiry").value = q.expires_on || "";
+    $("quoteError").hidden = true;
+    show("quoteView");
+    setTab("quotes");
+  }
+
+  async function loadQuoteLines() {
+    const qid = state.currentQuote.id;
+    state.quoteLines = await rest("GET", "quote_lines", { query: `?quote_id=eq.${qid}&select=*&order=sort_order.asc,created_at.asc` });
+    let ex = 0;
+    $("quoteLineBody").innerHTML = state.quoteLines.map((l) => {
+      const amt = lineEx(l);
+      ex += amt;
+      return `<tr>
+        <td><strong>${escapeHtml(l.title)}</strong><br><span class="meta">${escapeHtml(l.description || "").replaceAll("\n", "<br>")}</span></td>
+        <td>${l.qty}</td>
+        <td>$${dollars(l.unit_amount_cents)}</td>
+        <td>$${dollars(amt)}</td>
+        <td>${state.currentQuote.status === "draft" ? `<button type="button" class="ghost" data-delline="${l.id}">Remove</button>` : ""}</td>
+      </tr>`;
+    }).join("") || `<tr><td colspan="5">No lines</td></tr>`;
+    const gst = gstOn(ex);
+    $("quoteTotals").textContent = `Subtotal $${dollars(ex)} · GST 10% $${dollars(gst)} · Total $${dollars(ex + gst)}`;
+  }
+
+  async function linesFromTemplate(quoteId, templateId, jobId) {
+    const tasks = await rest("GET", "job_template_tasks", { query: `?template_id=eq.${templateId}&select=*&order=sort_order.asc` });
+    let jobTasks = [];
+    if (jobId) jobTasks = await rest("GET", "job_tasks", { query: `?job_id=eq.${jobId}&select=*&order=number.asc` });
+    let order = 0;
+    for (const t of tasks) {
+      const match = jobTasks.find((j) => j.title === t.title);
+      await rest("POST", "quote_lines", { body: {
+        quote_id: quoteId,
+        title: t.title,
+        description: "",
+        qty: 1,
+        unit_amount_cents: 0,
+        sort_order: order,
+        task_id: match?.id || null,
+      }});
+      order += 1;
+    }
+    if (!tasks.length && jobTasks.length) {
+      for (const t of jobTasks) {
+        await rest("POST", "quote_lines", { body: {
+          quote_id: quoteId,
+          title: t.title,
+          description: t.summary || "",
+          qty: 1,
+          unit_amount_cents: 0,
+          sort_order: order,
+          task_id: t.id,
+        }});
+        order += 1;
+      }
+    }
+  }
+
+  async function linesFromJobTasks(quoteId, jobId) {
+    const tasks = await rest("GET", "job_tasks", { query: `?job_id=eq.${jobId}&select=*&order=number.asc` });
+    const ids = tasks.map((t) => t.id);
+    let amounts = {};
+    if (ids.length) {
+      const rows = await rest("GET", "job_task_amounts", { query: `?task_id=in.(${ids.join(",")})&select=*` });
+      amounts = Object.fromEntries(rows.map((r) => [r.task_id, r.amount_cents]));
+    }
+    let order = 0;
+    for (const t of tasks) {
+      await rest("POST", "quote_lines", { body: {
+        quote_id: quoteId,
+        title: t.title,
+        description: t.summary || "",
+        qty: 1,
+        unit_amount_cents: amounts[t.id] || 0,
+        sort_order: order,
+        task_id: t.id,
+      }});
+      order += 1;
+    }
+  }
+
+  async function createQuoteForJob(jobId, templateId) {
+    const today = isoDate(new Date());
+    const created = await rest("POST", "quotes", { body: {
+      job_id: jobId,
+      number: "",
+      status: "draft",
+      issued_on: today,
+      expires_on: addDaysIso(today, 30),
+    }});
+    const q = created[0];
+    if (templateId) await linesFromTemplate(q.id, templateId, jobId);
+    else await linesFromJobTasks(q.id, jobId);
+    return q;
+  }
+
+  function labourSell(entry) {
+    const emp = (state.employees || []).find((e) => e.id === entry.employee_id);
+    const rate = personChargeCents ? personChargeCents(emp) : (state.chargeRates[entry.employee_id] || 0);
+    return centsFromMinutes ? centsFromMinutes(rate, entry.minutes) : Math.round((rate * (entry.minutes || 0)) / 60);
+  }
+
+  async function claimedIds(jobId) {
+    const claims = await rest("GET", "claims", { query: `?job_id=eq.${jobId}&select=id` });
+    if (!claims.length) return { labour: new Set(), material: new Set(), equipment: new Set(), portions: [] };
+    const lines = await rest("GET", "claim_lines", {
+      query: `?claim_id=in.(${claims.map((c) => c.id).join(",")})&select=*`,
+    });
+    const labour = new Set(lines.map((l) => l.labour_id).filter(Boolean));
+    const material = new Set(lines.map((l) => l.material_id).filter(Boolean));
+    const equipment = new Set(lines.map((l) => l.equipment_id).filter(Boolean));
+    return { labour, material, equipment, portions: lines.filter((l) => l.kind === "portion" || (l.kind === "lump" && (l.task_id || l.variation_id))) };
+  }
+
+  async function loadOpenLines() {
+    if (!isOffice() || !state.currentJob) return;
+    const jid = state.currentJob.id;
+    const claimed = await claimedIds(jid);
+    const labour = await rest("GET", "labour_entries", {
+      query: `?job_id=eq.${jid}&select=*,employees(name),job_tasks(number,title)&order=work_date.asc`,
+    });
+    const mats = await rest("GET", "material_entries", {
+      query: `?job_id=eq.${jid}&select=*,job_tasks(number,title)&order=created_at.asc`,
+    });
+    const eqs = await rest("GET", "equipment_entries", {
+      query: `?job_id=eq.${jid}&select=*,job_tasks(number,title)&order=created_at.asc`,
+    });
+    const openL = labour.filter((r) => !claimed.labour.has(r.id));
+    const openM = mats.filter((r) => !claimed.material.has(r.id));
+    const openE = eqs.filter((r) => !claimed.equipment.has(r.id));
+
+    const labourRows = openL.map((r) => {
+      const sell = labourSell(r);
+      const who = r.employees?.name || r.who || "";
+      const task = r.job_tasks ? `${r.job_tasks.number} ${r.job_tasks.title}` : "";
+      return `<label class="open-line"><input type="checkbox" data-kind="labour" data-id="${r.id}" data-cents="${sell}" data-title="${escapeHtml(who)}" data-desc="${escapeHtml(`${task} · ${r.work_date} · ${hhmm(r.minutes)}`)}" /> ${escapeHtml(who)} · ${escapeHtml(task)} · ${escapeHtml(r.work_date)} · ${hhmm(r.minutes)} · $${dollars(sell)}</label>`;
+    }).join("");
+    const matRows = openM.map((r) => {
+      const task = r.job_tasks ? `${r.job_tasks.number} ${r.job_tasks.title}` : "";
+      return `<label class="open-line"><input type="checkbox" data-kind="material" data-id="${r.id}" data-qty="${r.qty}" data-cents="0" data-title="${escapeHtml(r.description)}" data-desc="${escapeHtml(task)}" /> ${escapeHtml(task)} · ${escapeHtml(r.description)} × ${r.qty} <input class="line-price" data-price-for="${r.id}" inputmode="decimal" placeholder="Sell $" /></label>`;
+    }).join("");
+    const eqRows = openE.map((r) => {
+      const task = r.job_tasks ? `${r.job_tasks.number} ${r.job_tasks.title}` : "";
+      return `<label class="open-line"><input type="checkbox" data-kind="equipment" data-id="${r.id}" data-qty="${r.qty}" data-cents="0" data-title="${escapeHtml(r.description)}" data-desc="${escapeHtml(task)}" /> ${escapeHtml(task)} · ${escapeHtml(r.description)} × ${r.qty} <input class="line-price" data-price-for="${r.id}" inputmode="decimal" placeholder="Sell $" /></label>`;
+    }).join("");
+
+    $("openLines").innerHTML = [
+      labourRows && `<h3>Labour</h3>${labourRows}`,
+      matRows && `<h3>Materials</h3>${matRows}`,
+      eqRows && `<h3>Equipment</h3>${eqRows}`,
+      !labourRows && !matRows && !eqRows ? `<p class="meta">No open lines</p>` : "",
+      state.pendingPortions.length ? `<h3>Portions waiting</h3>${state.pendingPortions.map((p, i) => `<p class="meta">${escapeHtml(p.title)} · ${p.portion_bps / 100}% · $${dollars(p.unit_amount_cents)} <button type="button" class="ghost" data-drop-portion="${i}">Remove</button></p>`).join("")}` : "",
+    ].filter(Boolean).join("");
+
+    const tasks = await rest("GET", "job_tasks", { query: `?job_id=eq.${jid}&select=*&order=number.asc` });
+    const tIds = tasks.map((t) => t.id);
+    let tAmt = {};
+    if (tIds.length) {
+      const rows = await rest("GET", "job_task_amounts", { query: `?task_id=in.(${tIds.join(",")})&select=*` });
+      tAmt = Object.fromEntries(rows.map((r) => [r.task_id, r.amount_cents]));
+    }
+    const vars = await rest("GET", "job_variations", { query: `?job_id=eq.${jid}&status=eq.accepted&select=*` });
+    let vAmt = {};
+    if (vars.length) {
+      const rows = await rest("GET", "job_variation_amounts", { query: `?variation_id=in.(${vars.map((v) => v.id).join(",")})&select=*` });
+      vAmt = Object.fromEntries(rows.map((r) => [r.variation_id, r.amount_cents]));
+    }
+    const claimedByTask = {};
+    const claimedByVar = {};
+    let claimedJob = 0;
+    for (const p of claimed.portions) {
+      const amt = lineEx(p);
+      if (p.variation_id) claimedByVar[p.variation_id] = (claimedByVar[p.variation_id] || 0) + amt;
+      else if (p.task_id) claimedByTask[p.task_id] = (claimedByTask[p.task_id] || 0) + amt;
+      else claimedJob += amt;
+    }
+    const jobQuoted = state.currentJob.quoted_amount_cents || 0;
+    const opts = [];
+    if (jobQuoted) opts.push(`<option value="job:${state.currentJob.id}:${Math.max(0, jobQuoted - claimedJob)}">Job · remaining $${dollars(Math.max(0, jobQuoted - claimedJob))}</option>`);
+    for (const t of tasks) {
+      const sell = tAmt[t.id] || 0;
+      if (!sell) continue;
+      const left = Math.max(0, sell - (claimedByTask[t.id] || 0));
+      opts.push(`<option value="task:${t.id}:${left}">${escapeHtml(t.number)} ${escapeHtml(t.title)} · remaining $${dollars(left)}</option>`);
+    }
+    for (const v of vars) {
+      const sell = vAmt[v.id] || 0;
+      if (!sell) continue;
+      const left = Math.max(0, sell - (claimedByVar[v.id] || 0));
+      opts.push(`<option value="var:${v.id}:${left}">Variation · ${escapeHtml(v.title || v.description)} · remaining $${dollars(left)}</option>`);
+    }
+    $("portionTarget").innerHTML = opts.join("") || `<option value="">Nothing priced to claim a portion of</option>`;
+
+    await renderJobClaims(jid);
+  }
+
+  async function renderJobClaims(jid) {
+    const claims = await rest("GET", "claims", { query: `?job_id=eq.${jid}&select=*&order=created_at.asc` });
+    if (!claims.length) {
+      $("claimBody").innerHTML = `<tr><td colspan="5">No claims</td></tr>`;
+      return;
+    }
+    const lines = await rest("GET", "claim_lines", { query: `?claim_id=in.(${claims.map((c) => c.id).join(",")})&select=claim_id,qty,unit_amount_cents` });
+    const pays = await rest("GET", "invoice_payments", { query: `?claim_id=in.(${claims.map((c) => c.id).join(",")})&select=claim_id,amount_cents` });
+    const exMap = {};
+    const payMap = {};
+    for (const l of lines) exMap[l.claim_id] = (exMap[l.claim_id] || 0) + lineEx(l);
+    for (const p of pays) payMap[p.claim_id] = (payMap[p.claim_id] || 0) + p.amount_cents;
+    $("claimBody").innerHTML = claims.map((c) => {
+      const ex = exMap[c.id] || 0;
+      return `<tr data-cid="${c.id}">
+        <td class="num">${escapeHtml(c.number)}</td>
+        <td>${escapeHtml(c.title || "")}</td>
+        <td>${escapeHtml(claimPaidLabel(c, ex, payMap[c.id] || 0))}</td>
+        <td>$${dollars(ex + gstOn(ex))}</td>
+        <td><button type="button" class="ghost" data-openc="${c.id}">Open</button></td>
+      </tr>`;
+    }).join("");
+  }
+
+  async function openClaim(id) {
+    const rows = await rest("GET", "claims", {
+      query: `?id=eq.${id}&select=*,jobs(id,number,title,customers(name,company,phone,email,postal_address),sites(address,label))`,
+    });
+    state.currentClaim = rows[0];
+    if (!state.currentClaim) return;
+    const c = state.currentClaim;
+    const lines = await rest("GET", "claim_lines", { query: `?claim_id=eq.${id}&select=*&order=sort_order.asc,created_at.asc` });
+    state.claimLines = lines;
+    const pays = await rest("GET", "invoice_payments", { query: `?claim_id=eq.${id}&select=*&order=paid_on.asc` });
+    let ex = 0;
+    $("claimLineBody").innerHTML = lines.map((l) => {
+      const amt = lineEx(l);
+      ex += amt;
+      return `<tr>
+        <td><strong>${escapeHtml(l.title)}</strong><br><span class="meta">${escapeHtml(l.description || "").replaceAll("\n", "<br>")}</span></td>
+        <td>${l.qty}</td>
+        <td>$${dollars(l.unit_amount_cents)}</td>
+        <td>$${dollars(amt)}</td>
+      </tr>`;
+    }).join("") || `<tr><td colspan="4">No lines</td></tr>`;
+    const gst = gstOn(ex);
+    const total = ex + gst;
+    const paid = pays.reduce((a, p) => a + p.amount_cents, 0);
+    $("claimHead").textContent = `${c.number} · ${c.jobs?.title || ""}`;
+    $("claimMeta").textContent = `${c.title || ""} · ${claimPaidLabel(c, ex, paid)}`;
+    $("claimTotals").textContent = `Subtotal $${dollars(ex)} · GST 10% $${dollars(gst)} · Total $${dollars(total)}`;
+    $("payBody").innerHTML = pays.map((p) => `<tr><td>${escapeHtml(p.paid_on)}</td><td>$${dollars(p.amount_cents)}</td><td>${escapeHtml(p.reference || "")}</td></tr>`).join("") || `<tr><td colspan="3">No payments</td></tr>`;
+    $("payStatus").textContent = paid >= total && total > 0 ? "Paid" : `Paid $${dollars(paid)} · Remaining $${dollars(Math.max(0, total - paid))}`;
+    $("payDate").value = isoDate(new Date());
+    $("issueClaim").hidden = c.status === "issued";
+    $("delClaim").hidden = c.status === "issued";
+    $("payCard").hidden = c.status !== "issued";
+    $("claimViewError").hidden = true;
+    show("claimView");
+    setTab("jobs");
+  }
+
+  async function loadOpenInvoices() {
+    if (!isOffice()) return;
+    const claims = await rest("GET", "claims", {
+      query: "?select=*,jobs(number,title,customers(name))&status=eq.issued&order=issued_on.desc",
+    });
+    if (!claims.length) {
+      $("openInvoicesView").innerHTML = `<h2>Open invoices</h2><p class="hint">Issued invoices that are not fully paid.</p><p class="meta">None</p>`;
+      return;
+    }
+    const ids = claims.map((c) => c.id);
+    const lines = await rest("GET", "claim_lines", { query: `?claim_id=in.(${ids.join(",")})&select=claim_id,qty,unit_amount_cents` });
+    const pays = await rest("GET", "invoice_payments", { query: `?claim_id=in.(${ids.join(",")})&select=claim_id,amount_cents` });
+    const exMap = {};
+    const payMap = {};
+    for (const l of lines) exMap[l.claim_id] = (exMap[l.claim_id] || 0) + lineEx(l);
+    for (const p of pays) payMap[p.claim_id] = (payMap[p.claim_id] || 0) + p.amount_cents;
+    const open = claims.filter((c) => {
+      const due = (exMap[c.id] || 0) + gstOn(exMap[c.id] || 0);
+      return (payMap[c.id] || 0) < due;
+    });
+    $("openInvoicesView").innerHTML = `<h2>Open invoices</h2>
+      <p class="hint">Issued, not fully paid. Part payments stay here.</p>
+      <table class="jobs-table"><thead><tr><th>Number</th><th>Job</th><th>Customer</th><th>Due</th><th>Paid</th><th>Remaining</th></tr></thead>
+      <tbody>${open.map((c) => {
+        const ex = exMap[c.id] || 0;
+        const due = ex + gstOn(ex);
+        const paid = payMap[c.id] || 0;
+        return `<tr data-cid="${c.id}">
+          <td class="num">${escapeHtml(c.number)}</td>
+          <td>${escapeHtml(c.jobs?.title || "")}</td>
+          <td>${escapeHtml(c.jobs?.customers?.name || "")}</td>
+          <td>$${dollars(due)}</td>
+          <td>$${dollars(paid)}</td>
+          <td>$${dollars(due - paid)}</td>
+        </tr>`;
+      }).join("") || `<tr><td colspan="6">None</td></tr>`}</tbody></table>`;
+  }
+
+  function paperBlock(kind, doc, lines, extras) {
+    const p = state.paper || {};
+    const job = doc.jobs || {};
+    const cust = job.customers || {};
+    const site = job.sites || {};
+    const billName = [cust.company, cust.name].filter(Boolean)[0] || "";
+    const billAddr = cust.postal_address || "";
+    const ship = site.address || site.label || billAddr;
+    const accent = p.accent_hex || "#F15A22";
+    const ex = lines.reduce((a, l) => a + lineEx(l), 0);
+    const gst = gstOn(ex);
+    const today = doc.issued_on || isoDate(new Date());
+    const due = doc.due_on || (kind === "invoice" ? addDaysIso(today, p.payment_terms_days || 14) : "");
+    const lineHtml = lines.map((l) => `<tr>
+      <td><div class="paper-title">${escapeHtml(l.title)}</div><div class="paper-desc">${escapeHtml(l.description || "").replaceAll("\n", "<br>")}</div></td>
+      <td class="num">${l.qty}.00</td>
+      <td class="num">${dollars(l.unit_amount_cents)}</td>
+      <td>10%</td>
+      <td class="num">${dollars(lineEx(l))}</td>
+    </tr>`).join("");
+    const running = (extras?.running || []).map((r) => `<div class="paper-run"><span>${escapeHtml(r.label)}</span><span>$${dollars(r.cents)}</span></div>`).join("");
+    const pay = kind === "invoice" ? `<div class="paper-pay">
+      <p>Payment Due within ${p.payment_terms_days || 14} Days.</p>
+      <p>Payment to<br>${escapeHtml(p.account_name || "")}<br>${escapeHtml(p.bank_name || "")}<br>BSB: ${escapeHtml(p.bsb || "")} Acct: ${escapeHtml(p.account_number || "")}</p>
+    </div>` : `<div class="paper-pay"><p>${escapeHtml(p.quote_terms || "")}</p></div>`;
+    return `<article class="paper">
+      <header class="paper-top">
+        <div>
+          <h1>${kind === "invoice" ? "Tax Invoice" : "QUOTE"}</h1>
+          ${kind === "invoice" ? `<div class="paper-cols"><div><strong>Bill to</strong><br>${escapeHtml(billName)}<br>${escapeHtml(billAddr).replaceAll("\n", "<br>")}</div>
+          <div><strong>Ship to</strong><br>${escapeHtml(billName)}<br>${escapeHtml(ship).replaceAll("\n", "<br>")}</div></div>` : `<p>${escapeHtml(cust.name || billName)}<br>${escapeHtml(ship)}</p>`}
+        </div>
+        <div class="paper-brand">
+          <div class="paper-logo">${escapeHtml(p.trading_as || "INLAND ENERGY SERVICES")}</div>
+          <p>${escapeHtml(p.legal_name || "")}<br>T/as ${escapeHtml(p.trading_as || "")}<br>${escapeHtml(p.address || "").replaceAll("\n", "<br>")}<br>${escapeHtml(p.abn || "")}<br>Lic - ${escapeHtml(p.licence || "")}</p>
+        </div>
+      </header>
+      <div class="paper-rule" style="background:${accent}"></div>
+      <div class="paper-meta">
+        ${kind === "invoice" ? `<div><span>Amount due</span><strong>$${(dollars(ex + gst))}</strong></div>
+        <div><span>Due date</span><strong>${escapeHtml(due)}</strong></div>
+        <div><span>Issue date</span><strong>${escapeHtml(today)}</strong></div>
+        <div><span>Invoice number</span><strong>${escapeHtml(doc.number)}</strong></div>
+        <div><span>Reference</span><strong>${escapeHtml(doc.reference || job.title || "")}</strong></div>` : `<div><span>Date</span><strong>${escapeHtml(today)}</strong></div>
+        <div><span>Expiry</span><strong>${escapeHtml(doc.expires_on || "")}</strong></div>
+        <div><span>Quote Number</span><strong>${escapeHtml(doc.number)}</strong></div>`}
+      </div>
+      <table class="paper-lines">
+        <thead><tr><th>Description</th><th>Quantity</th><th>Price</th><th>Tax</th><th>Amount</th></tr></thead>
+        <tbody>${lineHtml}</tbody>
+      </table>
+      <div class="paper-totals">
+        <div><span>Subtotal</span><span>${dollars(ex)}</span></div>
+        <div><span>Total GST 10%</span><span>${dollars(gst)}</span></div>
+        <div class="grand"><span>${kind === "invoice" ? "Total" : "TOTAL AUD"}</span><span>${dollars(ex + gst)}</span></div>
+        ${running}
+      </div>
+      ${pay}
+    </article>`;
+  }
+
+  async function runningTotals(jobId, thisClaimId) {
+    const job = state.currentJob || (await rest("GET", "jobs", { query: `?id=eq.${jobId}&select=*` }))[0];
+    const quotes = await rest("GET", "quotes", { query: `?job_id=eq.${jobId}&status=eq.accepted&select=id` });
+    let original = job?.quoted_amount_cents || 0;
+    if (!original && quotes.length) {
+      const qlines = await rest("GET", "quote_lines", { query: `?quote_id=in.(${quotes.map((q) => q.id).join(",")})&select=qty,unit_amount_cents` });
+      original = qlines.reduce((a, l) => a + lineEx(l), 0);
+    }
+    const vars = await rest("GET", "job_variations", { query: `?job_id=eq.${jobId}&status=eq.accepted&select=id` });
+    let varSell = 0;
+    if (vars.length) {
+      const amounts = await rest("GET", "job_variation_amounts", { query: `?variation_id=in.(${vars.map((v) => v.id).join(",")})&select=amount_cents` });
+      varSell = amounts.reduce((a, r) => a + (r.amount_cents || 0), 0);
+    }
+    const claims = await rest("GET", "claims", { query: `?job_id=eq.${jobId}&status=eq.issued&select=id` });
+    let previous = 0;
+    let thisEx = 0;
+    if (claims.length) {
+      const lines = await rest("GET", "claim_lines", { query: `?claim_id=in.(${claims.map((c) => c.id).join(",")})&select=claim_id,qty,unit_amount_cents` });
+      for (const l of lines) {
+        const amt = lineEx(l);
+        if (l.claim_id === thisClaimId) thisEx += amt;
+        else previous += amt;
+      }
+    }
+    const contract = original + varSell;
+    const remaining = Math.max(0, contract - previous - thisEx);
+    if (!original && !varSell && !previous) return [];
+    return [
+      { label: "Original quote", cents: original },
+      { label: "Approved variations", cents: varSell },
+      { label: "Already claimed", cents: previous },
+      { label: "This claim", cents: thisEx },
+      { label: "Remaining", cents: remaining },
+    ];
+  }
+
+  async function exportPaper(kind) {
+    await loadPaper();
+    if (kind === "quote") {
+      $("paperSheet").innerHTML = paperBlock("quote", state.currentQuote, state.quoteLines);
+    } else {
+      const running = await runningTotals(state.currentClaim.job_id, state.currentClaim.id);
+      $("paperSheet").innerHTML = paperBlock("invoice", state.currentClaim, state.claimLines || [], { running });
+    }
+    document.body.classList.add("print-paper");
+    $("paperSheet").hidden = false;
+    window.print();
+    document.body.classList.remove("print-paper");
+    $("paperSheet").hidden = true;
+  }
+
+  async function acceptQuote() {
+    const q = state.currentQuote;
+    const jobId = q.job_id;
+    let ex = 0;
+    for (const l of state.quoteLines) {
+      ex += lineEx(l);
+      let taskId = l.task_id;
+      if (!taskId) {
+        const created = await rest("POST", "job_tasks", { body: {
+          job_id: jobId,
+          title: l.title,
+          summary: l.description || null,
+          number: "",
+          status: "quoted",
+        }});
+        taskId = created[0].id;
+        await rest("PATCH", "quote_lines", { query: `?id=eq.${l.id}`, body: { task_id: taskId } });
+      } else {
+        await rest("PATCH", "job_tasks", { query: `?id=eq.${taskId}`, body: { title: l.title, summary: l.description || null } });
+      }
+      const amt = lineEx(l);
+      const existing = await rest("GET", "job_task_amounts", { query: `?task_id=eq.${taskId}&select=task_id` });
+      if (existing.length) await rest("PATCH", "job_task_amounts", { query: `?task_id=eq.${taskId}`, body: { amount_cents: amt } });
+      else await rest("POST", "job_task_amounts", { body: { task_id: taskId, amount_cents: amt } });
+    }
+    await rest("PATCH", "jobs", { query: `?id=eq.${jobId}`, body: { status: "quoted", model: "quoted", quoted_amount_cents: ex } });
+  }
+
+  function setJobsViewMoney(name) {
+    const list = $("jobsListPane");
+    const week = $("weekView");
+    const inv = $("invoiceView");
+    const open = $("openInvoicesView");
+    const weekBar = $("weekBar");
+    if (list) list.hidden = name !== "list";
+    if (week) week.hidden = name !== "week";
+    if (inv) inv.hidden = name !== "invoice";
+    if (open) open.hidden = name !== "openInvoices";
+    if (weekBar) weekBar.hidden = name !== "week";
+    $("listViewBtn")?.classList.toggle("on", name === "list");
+    $("weekViewBtn")?.classList.toggle("on", name === "week");
+    $("invoiceViewBtn")?.classList.toggle("on", name === "invoice");
+    $("openInvoicesBtn")?.classList.toggle("on", name === "openInvoices");
+  }
+
+  api.refreshMoney = async function refreshMoney() {
+    if (!isOffice() || !state.currentJob) return;
+    try { await loadOpenLines(); } catch (err) { console.warn(err); }
+  };
+
+  $("newQuoteBtn")?.addEventListener("click", async () => {
+    await loadCustomers();
+    await loadTemplates();
+    $("nqTemplate").innerHTML = `<option value="">None</option>` + (state.templates || []).map((t) => `<option value="${t.id}">${escapeHtml(t.name)}</option>`).join("");
+    $("nqError").hidden = true;
+    show("newQuoteView");
+    setTab("quotes");
+  });
+  $("cancelNewQuote")?.addEventListener("click", () => { show("quotesTab"); setTab("quotes"); });
+  $("nqCustomer")?.addEventListener("change", async () => {
+    const c = findCustomerByName($("nqCustomer").value);
+    if (!c) return;
+    const sites = await rest("GET", "sites", { query: `?customer_id=eq.${c.id}&select=*` });
+    $("nqSiteOptions").innerHTML = sites.map((s) => `<option value="${escapeHtml(s.address || s.label)}"></option>`).join("");
+  });
+  $("newQuoteForm")?.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    $("nqError").hidden = true;
+    try {
+      let cust = findCustomerByName($("nqCustomer").value);
+      if (!cust) {
+        const made = await rest("POST", "customers", { body: { name: $("nqCustomer").value.trim() } });
+        cust = made[0];
+        await loadCustomers();
+      }
+      const site_id = await ensureSite(cust.id, $("nqSite").value, {});
+      const job = await rest("POST", "jobs", { body: {
+        title: $("nqTitle").value.trim(),
+        status: "quoted",
+        model: $("nqModel").value,
+        customer_id: cust.id,
+        site_id,
+        number: "",
+      }});
+      const tmpl = $("nqTemplate").value;
+      if (tmpl) await applyTemplate(job[0].id, tmpl);
+      else {
+        await rest("POST", "job_tasks", { body: { job_id: job[0].id, title: "General", number: "", status: "quoted" } });
+      }
+      const q = await createQuoteForJob(job[0].id, tmpl || null);
+      $("nqTitle").value = "";
+      await loadQuotes();
+      await openQuote(q.id);
+    } catch (err) {
+      $("nqError").textContent = err.message;
+      $("nqError").hidden = false;
+    }
+  });
+  $("quoteSearch")?.addEventListener("input", () => loadQuotes());
+  $("quoteStatusFilter")?.addEventListener("change", () => loadQuotes());
+  $("quoteList")?.addEventListener("click", (e) => {
+    const row = e.target.closest("tr[data-qid]");
+    if (row) openQuote(row.dataset.qid);
+  });
+  $("backToQuotes")?.addEventListener("click", async () => {
+    await loadQuotes();
+    show("quotesTab");
+    setTab("quotes");
+  });
+  $("quoteLineForm")?.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    try {
+      await rest("POST", "quote_lines", { body: {
+        quote_id: state.currentQuote.id,
+        title: $("qlTitle").value.trim(),
+        description: $("qlDesc").value.trim() || null,
+        qty: Number($("qlQty").value) || 1,
+        unit_amount_cents: $("qlPrice").value ? toCents($("qlPrice").value) : 0,
+        sort_order: state.quoteLines.length,
+      }});
+      $("qlTitle").value = "";
+      $("qlDesc").value = "";
+      $("qlPrice").value = "";
+      await loadQuoteLines();
+    } catch (err) {
+      $("quoteError").textContent = err.message;
+      $("quoteError").hidden = false;
+    }
+  });
+  $("quoteLineBody")?.addEventListener("click", async (e) => {
+    const btn = e.target.closest("[data-delline]");
+    if (!btn) return;
+    await rest("DELETE", "quote_lines", { query: `?id=eq.${btn.dataset.delline}` });
+    await loadQuoteLines();
+  });
+  $("saveQuote")?.addEventListener("click", async () => {
+    $("quoteError").hidden = true;
+    try {
+      const status = $("quoteStatus").value;
+      const body = { status, expires_on: $("quoteExpiry").value || null };
+      if (status === "sent" && !state.currentQuote.issued_on) body.issued_on = isoDate(new Date());
+      await rest("PATCH", "quotes", { query: `?id=eq.${state.currentQuote.id}`, body });
+      if (status === "accepted") await acceptQuote();
+      await openQuote(state.currentQuote.id);
+    } catch (err) {
+      $("quoteError").textContent = err.message;
+      $("quoteError").hidden = false;
+    }
+  });
+  $("dupQuote")?.addEventListener("click", async () => {
+    const name = window.prompt("Name for the copied quote job", `${state.currentQuote.jobs?.title || "Quote"} copy`);
+    if (!name) return;
+    const src = state.currentQuote;
+    const job = await rest("POST", "jobs", { body: {
+      title: name.trim(),
+      status: "quoted",
+      model: "quoted",
+      customer_id: src.jobs?.customer_id,
+      site_id: src.jobs?.site_id,
+      number: "",
+    }});
+    const q = await rest("POST", "quotes", { body: {
+      job_id: job[0].id,
+      number: "",
+      status: "draft",
+      issued_on: isoDate(new Date()),
+      expires_on: addDaysIso(isoDate(new Date()), 30),
+    }});
+    for (const l of state.quoteLines) {
+      await rest("POST", "quote_lines", { body: {
+        quote_id: q[0].id,
+        title: l.title,
+        description: l.description,
+        qty: l.qty,
+        unit_amount_cents: l.unit_amount_cents,
+        sort_order: l.sort_order,
+      }});
+    }
+    await openQuote(q[0].id);
+  });
+  $("delQuote")?.addEventListener("click", async () => {
+    if (state.currentQuote.status !== "draft") {
+      $("quoteError").textContent = "Only a draft quote can be deleted";
+      $("quoteError").hidden = false;
+      return;
+    }
+    if (!window.confirm("Delete this quote?")) return;
+    await rest("DELETE", "quotes", { query: `?id=eq.${state.currentQuote.id}` });
+    await loadQuotes();
+    show("quotesTab");
+    setTab("quotes");
+  });
+  $("exportQuotePdf")?.addEventListener("click", () => exportPaper("quote"));
+  $("openQuoteJob")?.addEventListener("click", () => openJob(state.currentQuote.job_id));
+  $("quoteOnJob")?.addEventListener("click", async () => {
+    try {
+      const q = await createQuoteForJob(state.currentJob.id, null);
+      await openQuote(q.id);
+    } catch (err) {
+      $("jobError").textContent = err.message;
+      $("jobError").hidden = false;
+    }
+  });
+
+  $("portionForm")?.addEventListener("submit", (e) => {
+    e.preventDefault();
+    $("claimError").hidden = true;
+    const raw = $("portionTarget").value;
+    if (!raw) return;
+    const pct = Number($("portionPct").value);
+    if (!pct || pct <= 0 || pct > 100) {
+      $("claimError").textContent = "Portion must be between 1 and 100";
+      $("claimError").hidden = false;
+      return;
+    }
+    const [kind, id, leftStr] = raw.split(":");
+    const left = Number(leftStr) || 0;
+    const bps = Math.round(pct * 100);
+    const cents = Math.round(left * bps / 10000);
+    if (cents <= 0) {
+      $("claimError").textContent = "Nothing left on that item";
+      $("claimError").hidden = false;
+      return;
+    }
+    const label = $("portionTarget").selectedOptions[0]?.textContent || "Portion";
+    state.pendingPortions.push({
+      kind: "portion",
+      title: `${pct}% · ${label.split("·")[0].trim()}`,
+      description: `${pct} percent`,
+      qty: 1,
+      unit_amount_cents: cents,
+      portion_bps: bps,
+      task_id: kind === "task" ? id : null,
+      variation_id: kind === "var" ? id : null,
+    });
+    $("portionPct").value = "";
+    loadOpenLines();
+  });
+  $("openLines")?.addEventListener("click", (e) => {
+    const drop = e.target.closest("[data-drop-portion]");
+    if (!drop) return;
+    state.pendingPortions.splice(Number(drop.dataset.dropPortion), 1);
+    loadOpenLines();
+  });
+  $("claimForm")?.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    $("claimError").hidden = true;
+    try {
+      const boxes = [...document.querySelectorAll("#openLines input[type=checkbox]:checked")];
+      if (!boxes.length && !state.pendingPortions.length) throw new Error("Tick lines or add a portion");
+      const title = $("claimTitle").value.trim() || `Claim ${(await rest("GET", "claims", { query: `?job_id=eq.${state.currentJob.id}&select=id` })).length + 1}`;
+      const today = isoDate(new Date());
+      const paper = state.paper || (await loadPaper(), state.paper) || {};
+      const created = await rest("POST", "claims", { body: {
+        job_id: state.currentJob.id,
+        number: "",
+        title,
+        status: "draft",
+        reference: state.currentJob.title,
+        issued_on: today,
+        due_on: addDaysIso(today, paper.payment_terms_days || 14),
+      }});
+      const cid = created[0].id;
+      let order = 0;
+      for (const p of state.pendingPortions) {
+        await rest("POST", "claim_lines", { body: {
+          claim_id: cid,
+          kind: "portion",
+          title: p.title,
+          description: p.description,
+          qty: 1,
+          unit_amount_cents: p.unit_amount_cents,
+          portion_bps: p.portion_bps,
+          task_id: p.task_id,
+          variation_id: p.variation_id,
+          sort_order: order,
+        }});
+        order += 1;
+      }
+      for (const box of boxes) {
+        let cents = Number(box.dataset.cents) || 0;
+        const price = document.querySelector(`[data-price-for="${box.dataset.id}"]`);
+        if (price && price.value) cents = toCents(price.value);
+        const body = {
+          claim_id: cid,
+          kind: box.dataset.kind,
+          title: box.dataset.title,
+          description: box.dataset.desc || null,
+          qty: Number(box.dataset.qty) || 1,
+          unit_amount_cents: cents,
+          sort_order: order,
+        };
+        if (box.dataset.kind === "labour") body.labour_id = box.dataset.id;
+        if (box.dataset.kind === "material") body.material_id = box.dataset.id;
+        if (box.dataset.kind === "equipment") body.equipment_id = box.dataset.id;
+        await rest("POST", "claim_lines", { body });
+        order += 1;
+      }
+      state.pendingPortions = [];
+      $("claimTitle").value = "";
+      await openClaim(cid);
+    } catch (err) {
+      $("claimError").textContent = err.message;
+      $("claimError").hidden = false;
+    }
+  });
+  $("claimBody")?.addEventListener("click", (e) => {
+    const id = e.target.closest("[data-openc]")?.dataset.openc || e.target.closest("tr[data-cid]")?.dataset.cid;
+    if (id) openClaim(id);
+  });
+  $("backToClaimJob")?.addEventListener("click", () => openJob(state.currentClaim?.job_id || state.currentJob?.id));
+  $("exportClaimPdf")?.addEventListener("click", () => exportPaper("invoice"));
+  $("issueClaim")?.addEventListener("click", async () => {
+    try {
+      await rest("PATCH", "claims", { query: `?id=eq.${state.currentClaim.id}`, body: { status: "issued" } });
+      await openClaim(state.currentClaim.id);
+    } catch (err) {
+      $("claimViewError").textContent = err.message;
+      $("claimViewError").hidden = false;
+    }
+  });
+  $("delClaim")?.addEventListener("click", async () => {
+    if (state.currentClaim.status !== "draft") return;
+    if (!window.confirm("Delete this draft claim? Lines go back to open.")) return;
+    const jid = state.currentClaim.job_id;
+    await rest("DELETE", "claims", { query: `?id=eq.${state.currentClaim.id}` });
+    await openJob(jid);
+  });
+  $("payForm")?.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    $("payError").hidden = true;
+    try {
+      await rest("POST", "invoice_payments", { body: {
+        claim_id: state.currentClaim.id,
+        amount_cents: toCents($("payAmount").value),
+        paid_on: $("payDate").value,
+        reference: $("payRef").value.trim() || null,
+      }});
+      $("payAmount").value = "";
+      $("payRef").value = "";
+      await openClaim(state.currentClaim.id);
+    } catch (err) {
+      $("payError").textContent = err.message;
+      $("payError").hidden = false;
+    }
+  });
+  $("openInvoicesBtn")?.addEventListener("click", async () => {
+    await loadOpenInvoices();
+    setJobsViewMoney("openInvoices");
+    show("jobsTab");
+    setTab("jobs");
+  });
+  $("openInvoicesView")?.addEventListener("click", (e) => {
+    const row = e.target.closest("tr[data-cid]");
+    if (row) openClaim(row.dataset.cid);
+  });
+
+  api.openQuotesTab = async function openQuotesTab() {
+    await loadQuotes();
+    show("quotesTab");
+    setTab("quotes");
+  };
+
+  api.acceptVariationAs = async function acceptVariationAs(id, asTask) {
+    const vars = await rest("GET", "job_variations", { query: `?id=eq.${id}&select=*` });
+    const v = vars[0];
+    if (!v) return;
+    let amounts = {};
+    try {
+      const rows = await rest("GET", "job_variation_amounts", { query: `?variation_id=eq.${id}&select=*` });
+      amounts = rows[0] || {};
+    } catch { /* field */ }
+    const title = (v.title || v.description || "Variation").split("\n")[0].slice(0, 80);
+    if (asTask) {
+      const created = await rest("POST", "job_tasks", { body: {
+        job_id: v.job_id,
+        title,
+        summary: v.description,
+        number: "",
+        status: state.currentJob?.status || "on_site",
+      }});
+      if (amounts.amount_cents != null) {
+        await rest("POST", "job_task_amounts", { body: { task_id: created[0].id, amount_cents: amounts.amount_cents } });
+      }
+      await rest("PATCH", "job_variations", { query: `?id=eq.${id}`, body: { status: "accepted", task_id: created[0].id } });
+    } else {
+      const src = state.currentJob;
+      const created = await rest("POST", "jobs", { body: {
+        title,
+        summary: v.description,
+        status: "enquiry",
+        model: "quoted",
+        quoted_amount_cents: amounts.amount_cents || null,
+        customer_id: src.customer_id,
+        site_id: src.site_id,
+        number: "",
+      }});
+      const task = await rest("POST", "job_tasks", { body: {
+        job_id: created[0].id,
+        title,
+        summary: v.description,
+        number: "",
+        status: "enquiry",
+      }});
+      if (amounts.amount_cents != null) {
+        await rest("POST", "job_task_amounts", { body: { task_id: task[0].id, amount_cents: amounts.amount_cents } });
+      }
+      await rest("PATCH", "job_variations", { query: `?id=eq.${id}`, body: { status: "accepted", spawned_job_id: created[0].id } });
+    }
+  };
+
+  loadPaper().catch(() => {});
+};
+
+if (window.JOBS_API) window.JobsMoney(window.JOBS_API);
 
 </script>
 </body>
