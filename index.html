@@ -117,6 +117,53 @@ button.link, .link {
 .toolbar input, .toolbar select { width: auto; min-width: 180px; flex: 1; }
 .job-actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: end; margin: 12px 0 4px; }
 .job-actions label { margin: 0; min-width: 180px; flex: 0 1 220px; }
+.job-ident {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 16px 20px;
+}
+.job-ident h1 { margin: 0 0 4px; }
+.job-where { margin: 0 0 8px; color: var(--muted); font-size: 14px; }
+.job-ident .meta { margin: 0 0 4px; }
+.job-ident .meta:empty, .job-where:empty { display: none; }
+.job-ident-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: end;
+  margin-top: 12px;
+}
+.job-ident-bar label { margin: 0; min-width: 160px; flex: 0 1 200px; }
+.job-folder-nav {
+  display: flex;
+  gap: 6px;
+  margin: 12px 0 0;
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  background: var(--bg);
+  padding: 8px 0;
+}
+.job-folder-nav button {
+  background: #fff;
+  color: var(--muted);
+  border: 1px solid var(--line);
+  padding: 8px 16px;
+}
+.job-folder-nav button.on {
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
+}
+.job-pane .card:first-child { margin-top: 8px; }
+.row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+@media (max-width: 720px) { .row-2 { grid-template-columns: 1fr; } }
+.job-more { display: flex; gap: 8px; flex-wrap: wrap; margin: 8px 0 16px; }
+.task-row { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
+.task-row .hours { color: var(--muted); font-size: 13px; white-space: nowrap; }
+.open-lines { margin: 8px 0 16px; }
+.open-lines td:first-child { width: 28px; }
 button.ghost {
   background: #fff;
   color: var(--accent);
@@ -202,7 +249,7 @@ body.field .office-only { display: none !important; }
 .photos img { width: 120px; height: 120px; object-fit: cover; border-radius: 8px; border: 1px solid var(--line); }
 #printRun { display: none; }
 .open-line { display: block; margin: 6px 0; font-size: 14px; }
-.open-line .line-price { width: 90px; margin-left: 8px; }
+.open-line .line-price, .open-lines .line-price { width: 90px; margin: 0; }
 .paper-rule { height: 4px; margin: 12px 0 16px; }
 .paper-top { display: flex; justify-content: space-between; gap: 24px; }
 .paper-logo { font-weight: 700; letter-spacing: 0.04em; margin-bottom: 8px; }
@@ -315,162 +362,197 @@ body.field .office-only { display: none !important; }
 
     <section id="jobView" hidden>
       <button type="button" class="link" id="backToList">← Jobs</button>
-      <div class="job-head">
-        <h1 id="jobTitle"></h1>
-        <div class="row">
-          <label>Job name
-            <input id="jobName" />
-          </label>
-          <label>Description
-            <input id="jobSummary" placeholder="Overall project" />
-          </label>
+      <div class="job-folder">
+        <span hidden>Job folder</span>
+        <div class="job-ident">
+          <h1 id="jobTitle"></h1>
+          <p class="job-where" id="jobWhere"></p>
+          <p class="meta" id="jobPhone"></p>
+          <p class="meta" id="jobSiteContact"></p>
+          <div class="job-ident-bar">
+            <label>Status
+              <select id="jobStatus">
+                <option value="enquiry">Enquiry</option>
+                <option value="quoted">Quoted</option>
+                <option value="scheduled">Scheduled</option>
+                <option value="on_site">On site</option>
+                <option value="complete">Complete</option>
+                <option value="to_invoice">To invoice</option>
+                <option value="invoiced">Invoiced</option>
+              </select>
+            </label>
+            <label>Scheduled
+              <input id="jobScheduled" type="date" />
+            </label>
+          </div>
+          <p class="error" id="jobError" hidden></p>
         </div>
-        <div class="job-actions">
-          <label>Status
-            <select id="jobStatus">
-              <option value="enquiry">Enquiry</option>
-              <option value="quoted">Quoted</option>
-              <option value="scheduled">Scheduled</option>
-              <option value="on_site">On site</option>
-              <option value="complete">Complete</option>
-              <option value="to_invoice">To invoice</option>
-              <option value="invoiced">Invoiced</option>
-            </select>
-          </label>
-          <label>Scheduled
-            <input id="jobScheduled" type="date" />
-          </label>
-          <label>Type
-            <select id="jobModel">
-              <option value="tm">TM</option>
-              <option value="quoted">Quoted</option>
-              <option value="measured">Measured</option>
-            </select>
-          </label>
-          <label class="office-only">Quoted $
-            <input id="jobQuoted" inputmode="decimal" placeholder="0.00" />
-          </label>
-          <button type="button" class="ghost" id="saveJob">Save job</button>
-          <button type="button" class="ghost" id="duplicateJob">Duplicate job</button>
-          <button type="button" class="ghost" id="saveTemplate">Save as template</button>
-          <button type="button" class="ghost office-only" id="quoteOnJob">Quote this job</button>
-          <button type="button" class="ghost office-only" id="deleteJob">Delete job</button>
+        <div class="job-folder-nav" id="jobFolderNav">
+          <button type="button" data-job-pane="job" class="on">Job</button>
+          <button type="button" data-job-pane="work">Work</button>
+          <button type="button" data-job-pane="pack">Pack</button>
+          <button type="button" data-job-pane="bill" class="office-only">Bill</button>
         </div>
-        <p class="meta" id="jobPhone"></p>
-        <p class="meta" id="jobSiteContact"></p>
-        <div class="row">
-          <label>Customer
-            <select id="jobCustomerSelect"></select>
-          </label>
-          <label>Site address
-            <input id="jobSiteAddress" list="jobSiteOptions" autocomplete="off" placeholder="Street, suburb" />
-            <datalist id="jobSiteOptions"></datalist>
-          </label>
+
+        <div class="job-pane" data-job-pane="job">
+          <div class="card">
+            <h2>Job</h2>
+            <div class="row-2">
+              <label>Job name
+                <input id="jobName" />
+              </label>
+              <label>Description
+                <input id="jobSummary" placeholder="Overall project" />
+              </label>
+            </div>
+            <div class="row-2">
+              <label>Type
+                <select id="jobModel">
+                  <option value="tm">TM</option>
+                  <option value="quoted">Quoted</option>
+                  <option value="measured">Measured</option>
+                </select>
+              </label>
+              <label class="office-only">Quoted $
+                <input id="jobQuoted" inputmode="decimal" placeholder="0.00" />
+              </label>
+            </div>
+            <button type="button" id="saveJob">Save job</button>
+          </div>
+          <div class="card">
+            <h2>Customer and site</h2>
+            <p class="hint">Customer is who you bill. Site is where you work.</p>
+            <div class="row-2">
+              <label>Customer
+                <select id="jobCustomerSelect"></select>
+              </label>
+              <label>Site address
+                <input id="jobSiteAddress" list="jobSiteOptions" autocomplete="off" placeholder="Street, suburb" />
+                <datalist id="jobSiteOptions"></datalist>
+              </label>
+            </div>
+            <div class="row-2">
+              <label>Site contact
+                <input id="jobSiteContactName" placeholder="Name on site" />
+              </label>
+              <label>Site phone
+                <input id="jobSiteContactPhone" placeholder="Phone on site" />
+              </label>
+            </div>
+            <label>Site notes
+              <input id="jobSiteNotes" placeholder="Gate, dog, meter, access" />
+            </label>
+            <div class="job-more">
+              <button type="button" class="ghost" id="copyCustomerContact">Same as customer</button>
+              <button type="button" class="ghost" id="saveSite">Save site</button>
+            </div>
+          </div>
+          <div class="card" id="crewCard">
+            <h2>Crew</h2>
+            <p class="hint">Who is planned that day. Hours still go on the task.</p>
+            <label>Date<input id="crewDate" type="date" /></label>
+            <div id="crewChecks" class="checks"></div>
+            <p class="meta" id="crewDays"></p>
+            <p class="error" id="crewError" hidden></p>
+          </div>
+          <div class="card">
+            <h2>Notes</h2>
+            <textarea id="jobNotes" rows="4" placeholder="What happened on site. Stays on this job."></textarea>
+            <button type="button" id="saveNotes">Save notes</button>
+          </div>
+          <div class="job-more">
+            <button type="button" class="ghost" id="duplicateJob">Duplicate job</button>
+            <button type="button" class="ghost" id="saveTemplate">Save as template</button>
+            <button type="button" class="ghost office-only" id="quoteOnJob">Quote this job</button>
+            <button type="button" class="ghost office-only" id="deleteJob">Delete job</button>
+          </div>
         </div>
-        <div class="row">
-          <label>Site contact
-            <input id="jobSiteContactName" placeholder="Name on site" />
-          </label>
-          <label>Site phone
-            <input id="jobSiteContactPhone" placeholder="Phone on site" />
-          </label>
+
+        <div class="job-pane" data-job-pane="work" hidden>
+          <div class="card">
+            <h2>Tasks</h2>
+            <p class="hint">Open a task to add hours, materials and plant.</p>
+            <ul id="taskList" class="job-list"></ul>
+            <form id="newTaskForm" class="inline">
+              <input id="newTaskTitle" placeholder="New task name" required />
+              <button type="submit">Add task</button>
+            </form>
+            <p class="error" id="taskError" hidden></p>
+          </div>
         </div>
-        <label>Site notes
-          <input id="jobSiteNotes" placeholder="Gate, dog, meter, access" />
-        </label>
-        <button type="button" class="ghost" id="copyCustomerContact">Same as customer</button>
-        <button type="button" class="ghost" id="saveSite">Save site</button>
-        <p class="hint">Customer is who you bill. Site is where you work. Duplicate copies customer, site, tasks, materials and equipment. Not hours, notes, crew or pack.</p>
-        <p class="error" id="jobError" hidden></p>
-      </div>
-      <div class="card" id="crewCard">
-        <h2>Crew</h2>
-        <p class="hint">Who is allocated on a date. Hours still go on the task. Change the date to put people on another day.</p>
-        <label>Date<input id="crewDate" type="date" /></label>
-        <div id="crewChecks" class="checks"></div>
-        <p class="meta" id="crewDays"></p>
-        <p class="error" id="crewError" hidden></p>
-      </div>
-      <div class="card" id="packCard">
-        <h2>Invoice pack</h2>
-        <p class="meta" id="packStatus"></p>
-        <h2>Completion checks</h2>
-        <div id="checkList" class="checks"></div>
-        <h2>Photos</h2>
-        <input id="photoFile" type="file" accept="image/*" />
-        <div id="photoList" class="photos"></div>
-        <p class="error" id="photoError" hidden></p>
-        <h2>Variations</h2>
-        <p class="hint office-only">Pending sits here, not in open lines. It does not freeze other claims.</p>
-        <form id="variationForm" class="inline">
-          <input id="varTitle" class="office-only" placeholder="Title" />
-          <input id="varDesc" placeholder="What changed" required />
-          <input id="varAmount" class="office-only" inputmode="decimal" placeholder="Amount $" />
-          <button type="submit">Add variation</button>
-        </form>
-        <p class="error" id="varError" hidden></p>
-        <table>
-          <thead><tr><th>What</th><th>Status</th><th class="office-only">Amount</th><th></th></tr></thead>
-          <tbody id="varBody"></tbody>
-        </table>
-      </div>
-      <div class="card office-only" id="claimCard">
-        <h2>Open lines</h2>
-        <p class="hint">Labour, materials and plant not on a claim. Tick what to bill, or take a portion of a task or variation.</p>
-        <div id="openLines"></div>
-        <h2>Portion</h2>
-        <form id="portionForm" class="inline">
-          <select id="portionTarget"></select>
-          <input id="portionPct" inputmode="decimal" placeholder="50" />
-          <span class="meta">%</span>
-          <button type="submit">Add portion to claim</button>
-        </form>
-        <form id="claimForm" class="inline">
-          <input id="claimTitle" placeholder="Claim 1" />
-          <button type="submit">Make a claim</button>
-        </form>
-        <p class="error" id="claimError" hidden></p>
-        <h2>Claims</h2>
-        <table>
-          <thead><tr><th>Number</th><th>Name</th><th>Status</th><th>Amount</th><th></th></tr></thead>
-          <tbody id="claimBody"></tbody>
-        </table>
-      </div>
-      <div class="card">
-        <h2>Notes</h2>
-        <textarea id="jobNotes" rows="4" placeholder="What happened on site. Stays on this job."></textarea>
-        <button type="button" id="saveNotes">Save notes</button>
-      </div>
-      <div class="card" id="jobSummary">
-        <h2>Job summary</h2>
-        <p class="hint">Internal picture. Client paper is a quote or a claim.</p>
-        <p class="meta" id="summaryHours"></p>
-        <p class="meta office-only" id="jobMoney"></p>
-        <table>
-          <thead><tr><th>Task</th><th>Who</th><th>Hours</th></tr></thead>
-          <tbody id="summaryLabourBody"></tbody>
-        </table>
-        <h2>Materials</h2>
-        <table>
-          <thead><tr><th>Task</th><th>Item</th><th>Qty</th><th class="office-only">Unit cost</th><th class="office-only">Amount</th></tr></thead>
-          <tbody id="summaryMaterialBody"></tbody>
-        </table>
-        <p class="meta office-only" id="summaryMaterialTotal"></p>
-        <h2>Equipment</h2>
-        <table>
-          <thead><tr><th>Task</th><th>Item</th><th>Qty</th><th class="office-only">Unit cost</th><th class="office-only">Amount</th></tr></thead>
-          <tbody id="summaryEquipmentBody"></tbody>
-        </table>
-        <p class="meta office-only" id="summaryEquipmentTotal"></p>
-      </div>
-      <div class="card">
-        <h2>Tasks</h2>
-        <ul id="taskList" class="job-list"></ul>
-        <form id="newTaskForm" class="inline">
-          <input id="newTaskTitle" placeholder="New task name" required />
-          <button type="submit">Add task</button>
-        </form>
-        <p class="error" id="taskError" hidden></p>
+
+        <div class="job-pane" data-job-pane="pack" hidden>
+          <div class="card" id="packCard">
+            <h2>Invoice pack</h2>
+            <p class="meta" id="packStatus"></p>
+            <h2>Completion checks</h2>
+            <div id="checkList" class="checks"></div>
+            <h2>Photos</h2>
+            <input id="photoFile" type="file" accept="image/*" />
+            <div id="photoList" class="photos"></div>
+            <p class="error" id="photoError" hidden></p>
+            <h2>Variations</h2>
+            <p class="hint office-only">Pending sits here, not in open lines. It does not freeze other claims.</p>
+            <form id="variationForm" class="inline">
+              <input id="varTitle" class="office-only" placeholder="Title" />
+              <input id="varDesc" placeholder="What changed" required />
+              <input id="varAmount" class="office-only" inputmode="decimal" placeholder="Amount $" />
+              <button type="submit">Add variation</button>
+            </form>
+            <p class="error" id="varError" hidden></p>
+            <table>
+              <thead><tr><th>What</th><th>Status</th><th class="office-only">Amount</th><th></th></tr></thead>
+              <tbody id="varBody"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="job-pane office-only" data-job-pane="bill" hidden>
+          <div class="card" id="jobSummaryCard">
+            <h2>Job summary</h2>
+            <p class="hint">Internal picture. Client paper is a quote or a claim.</p>
+            <p class="meta" id="summaryHours"></p>
+            <p class="meta office-only" id="jobMoney"></p>
+            <table>
+              <thead><tr><th>Task</th><th>Who</th><th>Hours</th></tr></thead>
+              <tbody id="summaryLabourBody"></tbody>
+            </table>
+            <h2>Materials</h2>
+            <table>
+              <thead><tr><th>Task</th><th>Item</th><th>Qty</th><th class="office-only">Unit cost</th><th class="office-only">Amount</th></tr></thead>
+              <tbody id="summaryMaterialBody"></tbody>
+            </table>
+            <p class="meta office-only" id="summaryMaterialTotal"></p>
+            <h2>Equipment</h2>
+            <table>
+              <thead><tr><th>Task</th><th>Item</th><th>Qty</th><th class="office-only">Unit cost</th><th class="office-only">Amount</th></tr></thead>
+              <tbody id="summaryEquipmentBody"></tbody>
+            </table>
+            <p class="meta office-only" id="summaryEquipmentTotal"></p>
+          </div>
+          <div class="card office-only" id="claimCard">
+            <h2>Open lines</h2>
+            <p class="hint">Labour, materials and plant not on a claim. Tick what to bill, or take a portion of a task or variation.</p>
+            <div id="openLines"></div>
+            <h2>Portion</h2>
+            <form id="portionForm" class="inline">
+              <select id="portionTarget"></select>
+              <input id="portionPct" inputmode="decimal" placeholder="50" />
+              <span class="meta">%</span>
+              <button type="submit">Add portion to claim</button>
+            </form>
+            <form id="claimForm" class="inline">
+              <input id="claimTitle" placeholder="Claim 1" />
+              <button type="submit">Make a claim</button>
+            </form>
+            <p class="error" id="claimError" hidden></p>
+            <h2>Claims</h2>
+            <table>
+              <thead><tr><th>Number</th><th>Name</th><th>Status</th><th>Amount</th><th></th></tr></thead>
+              <tbody id="claimBody"></tbody>
+            </table>
+          </div>
+        </div>
       </div>
     </section>
 
@@ -1037,6 +1119,7 @@ const JOBS = (() => {
     templates: [],
     employeeCosts: {},
     chargeRates: {},
+    jobPane: "job",
   };
 
   const $ = (id) => document.getElementById(id);
@@ -1160,6 +1243,17 @@ const JOBS = (() => {
 
   function setTab(name) {
     document.querySelectorAll("#nav button").forEach((b) => b.classList.toggle("on", b.dataset.tab === name));
+  }
+
+  function setJobPane(name) {
+    if (name === "bill" && !isOffice()) name = "job";
+    state.jobPane = name || "job";
+    document.querySelectorAll("#jobView .job-pane").forEach((p) => {
+      p.hidden = p.dataset.jobPane !== state.jobPane;
+    });
+    document.querySelectorAll("#jobFolderNav button").forEach((b) => {
+      b.classList.toggle("on", b.dataset.jobPane === state.jobPane);
+    });
   }
 
   function persistSession() {
@@ -1754,6 +1848,8 @@ const JOBS = (() => {
     $("jobSiteContactPhone").value = current?.contact_phone || "";
     const sc = [current?.contact_name, current?.contact_phone].filter(Boolean).join(" · ");
     $("jobSiteContact").textContent = sc ? `Site ${sc}` : "";
+    const cust = state.customers.find((c) => c.id === state.currentJob.customer_id);
+    $("jobWhere").textContent = [cust?.name, current?.address || current?.label].filter(Boolean).join(" · ");
   }
 
   function sitePayload() {
@@ -1966,7 +2062,7 @@ const JOBS = (() => {
     }).join("");
   }
 
-  async function openJob(id) {
+  async function openJob(id, pane) {
     const job = await rest("GET", "jobs", { query: `?id=eq.${id}&select=*,customers(name,phone,company),sites(label,address,notes,contact_name,contact_phone)` });
     state.currentJob = job[0];
     if (!state.currentJob) return;
@@ -1992,6 +2088,7 @@ const JOBS = (() => {
     if (window.JOBS_API?.refreshMoney) await window.JOBS_API.refreshMoney();
     show("jobView");
     setTab("jobs");
+    setJobPane(pane || "job");
   }
 
   async function openCustomer(id) {
@@ -2029,9 +2126,17 @@ const JOBS = (() => {
 
   async function loadTasks() {
     const tasks = await rest("GET", "job_tasks", { query: `?job_id=eq.${state.currentJob.id}&select=*&order=number.asc` });
+    const labour = await rest("GET", "labour_entries", { query: `?job_id=eq.${state.currentJob.id}&select=task_id,minutes` });
+    const mins = {};
+    labour.forEach((r) => { mins[r.task_id] = (mins[r.task_id] || 0) + (r.minutes || 0); });
     $("taskList").innerHTML = tasks.map((t) => `<li data-id="${t.id}">
-      <div class="num">${escapeHtml(t.number)}</div>
-      <strong>${escapeHtml(t.title)}</strong>
+      <div class="task-row">
+        <div>
+          <div class="num">${escapeHtml(t.number)}</div>
+          <strong>${escapeHtml(t.title)}</strong>
+        </div>
+        <span class="hours">${mins[t.id] ? hhmm(mins[t.id]) : ""}</span>
+      </div>
     </li>`).join("") || `<li>No tasks</li>`;
   }
 
@@ -2423,7 +2528,11 @@ const JOBS = (() => {
     if (state.jobsView === "week") await openWeek();
     else { setJobsView("list"); show("jobsTab"); }
   });
-  $("backToJob").addEventListener("click", () => openJob(state.currentJob.id));
+  $("backToJob").addEventListener("click", () => openJob(state.currentJob.id, "work"));
+  $("jobFolderNav").addEventListener("click", (e) => {
+    const btn = e.target.closest("button[data-job-pane]");
+    if (btn) setJobPane(btn.dataset.jobPane);
+  });
 
   $("jobStatus").addEventListener("change", async () => {
     $("jobError").hidden = true;
@@ -3436,21 +3545,24 @@ window.JobsMoney = function JobsMoney(api) {
       const sell = labourSell(r);
       const who = r.employees?.name || r.who || "";
       const task = r.job_tasks ? `${r.job_tasks.number} ${r.job_tasks.title}` : "";
-      return `<label class="open-line"><input type="checkbox" data-kind="labour" data-id="${r.id}" data-cents="${sell}" data-title="${escapeHtml(who)}" data-desc="${escapeHtml(`${task} · ${r.work_date} · ${hhmm(r.minutes)}`)}" /> ${escapeHtml(who)} · ${escapeHtml(task)} · ${escapeHtml(r.work_date)} · ${hhmm(r.minutes)} · $${dollars(sell)}</label>`;
+      return `<tr><td><input type="checkbox" data-kind="labour" data-id="${r.id}" data-cents="${sell}" data-title="${escapeHtml(who)}" data-desc="${escapeHtml(`${task} · ${r.work_date} · ${hhmm(r.minutes)}`)}" /></td><td>${escapeHtml(who)}</td><td>${escapeHtml(task)} · ${escapeHtml(r.work_date)} · ${hhmm(r.minutes)}</td><td>$${dollars(sell)}</td></tr>`;
     }).join("");
     const matRows = openM.map((r) => {
       const task = r.job_tasks ? `${r.job_tasks.number} ${r.job_tasks.title}` : "";
-      return `<label class="open-line"><input type="checkbox" data-kind="material" data-id="${r.id}" data-qty="${r.qty}" data-cents="0" data-title="${escapeHtml(r.description)}" data-desc="${escapeHtml(task)}" /> ${escapeHtml(task)} · ${escapeHtml(r.description)} × ${r.qty} <input class="line-price" data-price-for="${r.id}" inputmode="decimal" placeholder="Sell $" /></label>`;
+      return `<tr><td><input type="checkbox" data-kind="material" data-id="${r.id}" data-qty="${r.qty}" data-cents="0" data-title="${escapeHtml(r.description)}" data-desc="${escapeHtml(task)}" /></td><td>${escapeHtml(r.description)} × ${r.qty}</td><td>${escapeHtml(task)}</td><td><input class="line-price" data-price-for="${r.id}" inputmode="decimal" placeholder="Sell $" /></td></tr>`;
     }).join("");
     const eqRows = openE.map((r) => {
       const task = r.job_tasks ? `${r.job_tasks.number} ${r.job_tasks.title}` : "";
-      return `<label class="open-line"><input type="checkbox" data-kind="equipment" data-id="${r.id}" data-qty="${r.qty}" data-cents="0" data-title="${escapeHtml(r.description)}" data-desc="${escapeHtml(task)}" /> ${escapeHtml(task)} · ${escapeHtml(r.description)} × ${r.qty} <input class="line-price" data-price-for="${r.id}" inputmode="decimal" placeholder="Sell $" /></label>`;
+      return `<tr><td><input type="checkbox" data-kind="equipment" data-id="${r.id}" data-qty="${r.qty}" data-cents="0" data-title="${escapeHtml(r.description)}" data-desc="${escapeHtml(task)}" /></td><td>${escapeHtml(r.description)} × ${r.qty}</td><td>${escapeHtml(task)}</td><td><input class="line-price" data-price-for="${r.id}" inputmode="decimal" placeholder="Sell $" /></td></tr>`;
     }).join("");
 
+    const table = (title, rows) => rows
+      ? `<h3>${title}</h3><table class="open-lines"><thead><tr><th></th><th>What</th><th>Detail</th><th></th></tr></thead><tbody>${rows}</tbody></table>`
+      : "";
     $("openLines").innerHTML = [
-      labourRows && `<h3>Labour</h3>${labourRows}`,
-      matRows && `<h3>Materials</h3>${matRows}`,
-      eqRows && `<h3>Equipment</h3>${eqRows}`,
+      table("Labour", labourRows),
+      table("Materials", matRows),
+      table("Equipment", eqRows),
       !labourRows && !matRows && !eqRows ? `<p class="meta">No open lines</p>` : "",
       state.pendingPortions.length ? `<h3>Portions waiting</h3>${state.pendingPortions.map((p, i) => `<p class="meta">${escapeHtml(p.title)} · ${p.portion_bps / 100}% · $${dollars(p.unit_amount_cents)} <button type="button" class="ghost" data-drop-portion="${i}">Remove</button></p>`).join("")}` : "",
     ].filter(Boolean).join("");
