@@ -264,9 +264,15 @@ body.field .office-only { display: none !important; }
 .paper-totals div, .paper-run { display: flex; justify-content: space-between; margin: 4px 0; }
 .paper-totals .grand { font-weight: 700; margin-top: 8px; }
 .paper-pay { margin-top: 28px; font-size: 14px; }
+.money-strip { font-size: 14px; font-weight: 600; letter-spacing: -0.02em; margin: 8px 0; }
+.po-number { font-size: 28px; font-weight: 700; letter-spacing: -0.04em; margin: 8px 0; }
+.month-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px; }
+.day-col.mute { opacity: 0.4; }
+.paper-logo { font-weight: 800; letter-spacing: 0.12em; font-size: 18px; color: #1d1d1f; margin-bottom: 8px; }
+.paper-meta .grand-due { font-size: 22px; }
 #paperSheet { display: none; }
 @media print {
-  header, nav, .toolbar, .chips, #loginView, #jobsListPane, #weekView, #weekBar, #invoiceView, #openInvoicesView, #jobView, #taskView, #newJobView, #customersTab, #customerView, #employeesTab, #catalogueTab, #quotesTab, #quoteView, #claimView, #newQuoteView, #templatesTab, #templateView, #listError, #quickFilters { display: none !important; }
+  header, nav, .toolbar, .chips, #loginView, #jobsListPane, #weekView, #weekBar, #invoiceView, #openInvoicesView, #jobView, #taskView, #newJobView, #customersTab, #customerView, #employeesTab, #catalogueTab, #quotesTab, #quoteView, #claimView, #newQuoteView, #templatesTab, #templateView, #poView, #pickUpView, #listError, #quickFilters { display: none !important; }
   body:not(.print-paper) #printRun { display: block !important; }
   body.print-paper #printRun { display: none !important; }
   body.print-paper #paperSheet { display: block !important; }
@@ -331,10 +337,14 @@ body.field .office-only { display: none !important; }
         <button type="button" data-quick="to_invoice">To invoice</button>
       </div>
       <div class="toolbar" id="weekBar" hidden>
+        <button type="button" class="ghost" id="calMonth">Month</button>
+        <button type="button" class="ghost on" id="calWeek">Week</button>
+        <button type="button" class="ghost" id="calDay">Day</button>
         <button type="button" class="ghost" id="weekPrev">Previous</button>
         <strong id="weekLabel"></strong>
         <button type="button" class="ghost" id="weekToday">This week</button>
         <button type="button" class="ghost" id="weekNext">Next</button>
+        <button type="button" class="ghost" id="planHoursBtn">Plan or hours</button>
         <button type="button" class="ghost" id="printToday">Print today</button>
       </div>
       <div id="weekView" hidden></div>
@@ -369,6 +379,8 @@ body.field .office-only { display: none !important; }
           <p class="job-where" id="jobWhere"></p>
           <p class="meta" id="jobPhone"></p>
           <p class="meta" id="jobSiteContact"></p>
+          <p class="money-strip office-only" id="jobMoneyStrip" hidden>Quoted · Claimed · Left</p>
+          <p class="meta" id="jobNext"></p>
           <div class="job-ident-bar">
             <label>Status
               <select id="jobStatus">
@@ -377,8 +389,6 @@ body.field .office-only { display: none !important; }
                 <option value="scheduled">Scheduled</option>
                 <option value="on_site">On site</option>
                 <option value="complete">Complete</option>
-                <option value="to_invoice">To invoice</option>
-                <option value="invoiced">Invoiced</option>
               </select>
             </label>
             <label>Scheduled
@@ -479,6 +489,20 @@ body.field .office-only { display: none !important; }
             </form>
             <p class="error" id="taskError" hidden></p>
           </div>
+          <div class="card" id="poCard">
+            <h2>Purchase order</h2>
+            <p class="hint">Give the supplier this number. Gear lands on the job when you pick up the bill.</p>
+            <form id="newPoForm" class="inline">
+              <select id="poTask"></select>
+              <input id="poSupplier" placeholder="Supplier" />
+              <button type="submit">New order</button>
+            </form>
+            <p class="error" id="poListError" hidden></p>
+            <table>
+              <thead><tr><th>Number</th><th>Supplier</th><th>Status</th><th></th></tr></thead>
+              <tbody id="poBody"></tbody>
+            </table>
+          </div>
         </div>
 
         <div class="job-pane" data-job-pane="pack" hidden>
@@ -576,8 +600,10 @@ body.field .office-only { display: none !important; }
           <label>Note<input id="labourNote" /></label>
           <p class="meta" id="labourPreview"></p>
           <p class="error" id="labourError" hidden></p>
-          <button type="submit">Add labour</button>
+          <button type="submit" id="labourSave">Add labour</button>
+          <button type="button" class="ghost" id="labourCancel" hidden>Cancel</button>
         </form>
+        <p class="hint">Click a line to fix it. Issued claims stay locked.</p>
         <table>
           <thead><tr><th>Who</th><th>Date</th><th>Start</th><th>Finish</th><th>Hours</th><th>Note</th></tr></thead>
           <tbody id="labourBody"></tbody>
@@ -947,6 +973,7 @@ body.field .office-only { display: none !important; }
           </label>
           <label>Expiry<input id="quoteExpiry" type="date" /></label>
           <button type="button" class="ghost" id="saveQuote">Save quote</button>
+          <button type="button" class="ghost" id="reviseQuote">Revise quote</button>
           <button type="button" class="ghost" id="dupQuote">Duplicate</button>
           <button type="button" class="ghost" id="delQuote">Delete</button>
           <button type="button" id="exportQuotePdf">Export PDF</button>
@@ -1009,6 +1036,53 @@ body.field .office-only { display: none !important; }
           <tbody id="payBody"></tbody>
         </table>
         <p class="meta" id="payStatus"></p>
+      </div>
+    </section>
+
+    <section id="poView" hidden>
+      <button type="button" class="link" id="backToPoJob">← Job</button>
+      <div class="job-head">
+        <h1 id="poHead">Purchase order</h1>
+        <p class="meta" id="poMeta"></p>
+        <p class="po-number" id="poNumber"></p>
+        <div class="job-actions">
+          <button type="button" class="ghost" id="markPoSent">Mark sent</button>
+          <button type="button" class="ghost" id="markPoReceived">Received</button>
+          <button type="button" id="pickUpBill">Pick up bill</button>
+          <button type="button" class="ghost" id="delPo">Delete draft</button>
+        </div>
+        <p class="error" id="poError" hidden></p>
+      </div>
+      <div class="card">
+        <h2>Lines</h2>
+        <form id="poLineForm" class="inline">
+          <select id="poLineCat"><option value="">Ad-hoc</option></select>
+          <input id="poLineDesc" placeholder="Item" required />
+          <input id="poLineQty" type="number" min="1" value="1" required />
+          <input id="poLineCost" class="office-only" inputmode="decimal" placeholder="Unit $" />
+          <button type="submit">Add line</button>
+        </form>
+        <table>
+          <thead><tr><th>Item</th><th>Qty</th><th class="office-only">Unit</th><th></th></tr></thead>
+          <tbody id="poLineBody"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="pickUpView" hidden>
+      <button type="button" class="link" id="backToPo">← Order</button>
+      <div class="card">
+        <h1>Pick up bill</h1>
+        <p class="hint">Save the supplier PDF from the email and drop it here. We read it. You check. Then it posts.</p>
+        <input id="billPdf" type="file" accept="application/pdf,image/*" />
+        <label>Their invoice number<input id="billInvNo" /></label>
+        <p class="meta" id="billParsed"></p>
+        <p class="error" id="billError" hidden></p>
+        <table>
+          <thead><tr><th>Item</th><th>Qty</th><th>Unit $</th></tr></thead>
+          <tbody id="billLineBody"></tbody>
+        </table>
+        <button type="button" id="confirmBill">Add</button>
       </div>
     </section>
 
@@ -1091,6 +1165,18 @@ body.field .office-only { display: none !important; }
     </form>
   </dialog>
 
+  <dialog id="scheduleAfterQuote">
+    <form method="dialog" class="card" id="scheduleAfterQuoteForm">
+      <h2>Set a date</h2>
+      <p>Quote accepted. When is the crew going?</p>
+      <label>Scheduled<input id="acceptSchedule" type="date" /></label>
+      <menu>
+        <button type="submit" value="skip">Later</button>
+        <button type="submit" value="ok" id="acceptScheduleOk">Schedule</button>
+      </menu>
+    </form>
+  </dialog>
+
   <script>
 window.CONFIG = { url: "https://ptoexwskxhbtepgsncqq.supabase.co", anonKey: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InB0b2V4d3NreGhidGVwZ3NuY3FxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg2MDQwNDIsImV4cCI6MjEwNDE4MDA0Mn0.HYOondB7Y-8ohsl9Tj2dzMC6syq_9KMcCJu0G5dE8H4" };
 
@@ -1115,6 +1201,11 @@ const JOBS = (() => {
     currentCustomer: null,
     jobsView: "list",
     weekMonday: null,
+    calMode: "week",
+    hoursMode: false,
+    weekLabour: [],
+    editLabourId: null,
+    currentJobTasks: [],
     allocations: [],
     templates: [],
     employeeCosts: {},
@@ -1193,7 +1284,7 @@ const JOBS = (() => {
   function statusLabel(s) {
     return ({
       enquiry: "Enquiry", quoted: "Quoted", scheduled: "Scheduled",
-      on_site: "On site", complete: "Complete", to_invoice: "To invoice", invoiced: "Invoiced",
+      on_site: "On site", complete: "Complete", to_invoice: "Complete", invoiced: "Complete",
     })[s] || s;
   }
 
@@ -1236,7 +1327,7 @@ const JOBS = (() => {
 
   const ROLE_ORDER = ["trade", "apprentice", "supervisor", "project_manager", "subcontractor"];
 
-  const views = ["loginView", "jobsTab", "jobView", "taskView", "newJobView", "customersTab", "customerView", "employeesTab", "employeeView", "ratesView", "catalogueTab", "templatesTab", "templateView", "quotesTab", "newQuoteView", "quoteView", "claimView", "paperSheet"];
+  const views = ["loginView", "jobsTab", "jobView", "taskView", "newJobView", "customersTab", "customerView", "employeesTab", "employeeView", "ratesView", "catalogueTab", "templatesTab", "templateView", "quotesTab", "newQuoteView", "quoteView", "claimView", "paperSheet", "poView", "pickUpView"];
   function show(id) {
     views.forEach((v) => { const el = $(v); if (el) el.hidden = v !== id; });
   }
@@ -1719,37 +1810,79 @@ const JOBS = (() => {
     return jobs.size;
   }
 
+  function hoursOnDay(employeeId, iso) {
+    return (state.weekLabour || [])
+      .filter((l) => l.employee_id === employeeId && l.work_date === iso)
+      .reduce((a, r) => a + (r.minutes || 0), 0);
+  }
+
   function renderWeek() {
     if (!state.weekMonday) state.weekMonday = mondayOf(new Date());
-    const days = weekDates();
+    const mode = state.calMode || "week";
+    $("calMonth")?.classList.toggle("on", mode === "month");
+    $("calWeek")?.classList.toggle("on", mode === "week");
+    $("calDay")?.classList.toggle("on", mode === "day");
+    $("planHoursBtn")?.classList.toggle("on", !!state.hoursMode);
+    $("planHoursBtn") && ($("planHoursBtn").textContent = state.hoursMode ? "Hours" : "Plan or hours");
     const today = isoDate(new Date());
-    $("weekLabel").textContent = `${isoDate(days[0])} – ${isoDate(days[6])}`;
+    let days;
+    if (mode === "day") {
+      days = [state.weekMonday];
+      $("weekLabel").textContent = isoDate(days[0]);
+    } else if (mode === "month") {
+      const first = new Date(state.weekMonday.getFullYear(), state.weekMonday.getMonth(), 1);
+      const start = mondayOf(first);
+      const last = new Date(first.getFullYear(), first.getMonth() + 1, 0);
+      const cells = [];
+      for (let d = new Date(start); d <= last || d.getDay() !== 1; d = addDays(d, 1)) {
+        cells.push(new Date(d));
+        if (cells.length >= 42) break;
+      }
+      days = cells;
+      $("weekLabel").textContent = first.toLocaleString("en-AU", { month: "long", year: "numeric" }) + " · This month";
+    } else {
+      days = weekDates();
+      $("weekLabel").textContent = `${isoDate(days[0])} – ${isoDate(days[6])}`;
+    }
     const dayNames = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
-    const cols = days.map((d, i) => {
+    const cols = days.map((d) => {
       const iso = isoDate(d);
       const jobs = jobsOnDay(iso);
       const chips = jobs.map((j) => {
         const people = crewOnDay(j.id, iso);
-        const names = people.map((a) => {
-          const clash = clashCount(a.employee_id, iso) > 1;
-          return `<span class="${clash ? "clash" : ""}">${escapeHtml(a.employees?.name || "")}</span>`;
-        }).join(", ");
+        let extra;
+        if (state.hoursMode) {
+          const mins = (state.weekLabour || []).filter((l) => l.job_id === j.id && l.work_date === iso)
+            .reduce((a, r) => a + (r.minutes || 0), 0);
+          extra = mins ? hhmm(mins) : "No hours";
+        } else {
+          extra = people.map((a) => {
+            const clash = clashCount(a.employee_id, iso) > 1;
+            return `<span class="${clash ? "clash" : ""}">${escapeHtml(a.employees?.name || "")}</span>`;
+          }).join(", ") || "No crew";
+        }
         return `<button type="button" class="job-chip" data-id="${j.id}">
           <strong>${escapeHtml(j.number)}</strong> ${escapeHtml(j.title)}
-          <span class="who">${escapeHtml(siteAddress(j) || statusLabel(j.status))}${names ? " · " : " · "}${names || "No crew"}</span>
+          <span class="who">${escapeHtml(siteAddress(j))} · ${extra}</span>
         </button>`;
       }).join("") || `<p class="meta">—</p>`;
-      return `<div class="day-col${iso === today ? " today" : ""}">
-        <h3>${dayNames[i]} ${iso.slice(8)}</h3>
+      const mute = mode === "month" && d.getMonth() !== state.weekMonday.getMonth();
+      return `<div class="day-col${iso === today ? " today" : ""}${mute ? " mute" : ""}">
+        <h3>${dayNames[(d.getDay() + 6) % 7]} ${iso.slice(8)}</h3>
         ${chips}
       </div>`;
     }).join("");
 
     const people = (state.employees || []).filter((e) => e.active !== false);
-    const head = `<tr><th>Who</th>${dayNames.map((n) => `<th>${n}</th>`).join("")}</tr>`;
+    const tableDays = mode === "month" ? weekDates() : days;
+    const head = `<tr><th>Who</th>${tableDays.map((d) => `<th>${dayNames[(d.getDay() + 6) % 7]}</th>`).join("")}<th>Hours</th></tr>`;
     const body = people.map((e) => {
-      const cells = days.map((d) => {
+      const cells = tableDays.map((d) => {
         const iso = isoDate(d);
+        if (state.hoursMode) {
+          const mins = hoursOnDay(e.id, iso);
+          return `<td>${mins ? hhmm(mins) : "—"}</td>`;
+        }
         const rows = state.allocations.filter((a) => a.employee_id === e.id && a.work_date === iso);
         const labels = rows.map((a) => {
           const j = state.jobs.find((x) => x.id === a.job_id);
@@ -1758,12 +1891,14 @@ const JOBS = (() => {
         const clash = labels.length > 1;
         return `<td class="${clash ? "clash" : ""}">${escapeHtml(labels.join(", ") || "—")}</td>`;
       }).join("");
-      return `<tr><td>${escapeHtml(e.name)}</td>${cells}</tr>`;
-    }).join("") || `<tr><td colspan="8">Add employees first.</td></tr>`;
+      const weekMins = tableDays.reduce((a, d) => a + hoursOnDay(e.id, isoDate(d)), 0);
+      return `<tr data-emp-week="${e.id}"><td>${escapeHtml(e.name)}</td>${cells}<td>${weekMins ? hhmm(weekMins) : "—"}</td></tr>`;
+    }).join("") || `<tr><td colspan="9">Add employees first.</td></tr>`;
 
-    $("weekView").innerHTML = `<div class="week-wrap"><div class="week-grid">${cols}</div></div>
+    const gridClass = mode === "month" ? "week-grid month-grid" : "week-grid";
+    $("weekView").innerHTML = `<div class="week-wrap"><div class="${gridClass}">${cols}</div></div>
       <div class="card people-week">
-        <h2>Who is allocated</h2>
+        <h2>${state.hoursMode ? "Hours this week" : "Who is allocated"}</h2>
         <table><thead>${head}</thead><tbody>${body}</tbody></table>
       </div>`;
   }
@@ -1773,6 +1908,14 @@ const JOBS = (() => {
     if (!state.employees.length) await loadEmployees();
     if (!state.jobs.length) await loadJobs();
     await loadWeekAllocations();
+    if (state.hoursMode) {
+      const days = weekDates();
+      const from = isoDate(days[0]);
+      const to = isoDate(days[6]);
+      state.weekLabour = await rest("GET", "labour_entries", {
+        query: `?work_date=gte.${from}&work_date=lte.${to}&select=id,job_id,employee_id,work_date,minutes`,
+      });
+    } else state.weekLabour = [];
     setJobsView("week");
     show("jobsTab");
     setTab("jobs");
@@ -2069,7 +2212,8 @@ const JOBS = (() => {
     $("jobTitle").textContent = `${state.currentJob.number} · ${state.currentJob.title}`;
     $("jobName").value = state.currentJob.title || "";
     $("jobSummary").value = state.currentJob.summary || "";
-    $("jobStatus").value = state.currentJob.status;
+    const st = state.currentJob.status;
+    $("jobStatus").value = (st === "to_invoice" || st === "invoiced") ? "complete" : st;
     $("jobScheduled").value = state.currentJob.scheduled_on || "";
     $("crewDate").value = state.currentJob.scheduled_on || isoDate(new Date());
     $("jobNotes").value = state.currentJob.notes || "";
@@ -2126,6 +2270,7 @@ const JOBS = (() => {
 
   async function loadTasks() {
     const tasks = await rest("GET", "job_tasks", { query: `?job_id=eq.${state.currentJob.id}&select=*&order=number.asc` });
+    state.currentJobTasks = tasks;
     const labour = await rest("GET", "labour_entries", { query: `?job_id=eq.${state.currentJob.id}&select=task_id,minutes` });
     const mins = {};
     labour.forEach((r) => { mins[r.task_id] = (mins[r.task_id] || 0) + (r.minutes || 0); });
@@ -2138,6 +2283,7 @@ const JOBS = (() => {
         <span class="hours">${mins[t.id] ? hhmm(mins[t.id]) : ""}</span>
       </div>
     </li>`).join("") || `<li>No tasks</li>`;
+    if (window.JOBS_API?.loadPos) await window.JOBS_API.loadPos();
   }
 
   function taskLabel(row) {
@@ -2254,7 +2400,7 @@ const JOBS = (() => {
     const labour = await rest("GET", "labour_entries", {
       query: `?task_id=eq.${tid}&select=*,employees(name,classification)&order=work_date.desc,created_at.desc`,
     });
-    $("labourBody").innerHTML = labour.map((r) => `<tr>
+    $("labourBody").innerHTML = labour.map((r) => `<tr data-labour="${r.id}" data-emp="${r.employee_id || ""}">
       <td>${escapeHtml(r.employees?.name || r.who || "")}</td>
       <td>${escapeHtml(r.work_date)}</td>
       <td>${r.start_minutes != null ? hhmm(r.start_minutes) : "—"}</td>
@@ -2272,7 +2418,7 @@ const JOBS = (() => {
       const rows = await rest("GET", "material_costs", { query: `?material_id=in.(${ids})&select=*` });
       mcosts = Object.fromEntries(rows.map((r) => [r.material_id, r.unit_cost_cents]));
     }
-    $("materialBody").innerHTML = mats.map((r) => `<tr>
+    $("materialBody").innerHTML = mats.map((r) => `<tr data-mat="${r.id}">
       <td>${escapeHtml(r.description)}</td><td>${r.qty}</td>
       <td class="office-only">${dollars(mcosts[r.id])}</td>
     </tr>`).join("");
@@ -2284,7 +2430,7 @@ const JOBS = (() => {
       const rows = await rest("GET", "equipment_costs", { query: `?equipment_id=in.(${ids})&select=*` });
       ecosts = Object.fromEntries(rows.map((r) => [r.equipment_id, r.unit_cost_cents]));
     }
-    $("equipmentBody").innerHTML = eqs.map((r) => `<tr>
+    $("equipmentBody").innerHTML = eqs.map((r) => `<tr data-eq="${r.id}">
       <td>${escapeHtml(r.description)}</td><td>${r.qty}</td>
       <td class="office-only">${dollars(ecosts[r.id])}</td>
     </tr>`).join("");
@@ -2459,18 +2605,24 @@ const JOBS = (() => {
     setTab("jobs");
   });
   $("weekViewBtn").addEventListener("click", () => openWeek());
+  $("calMonth")?.addEventListener("click", async () => { state.calMode = "month"; await openWeek(); });
+  $("calWeek")?.addEventListener("click", async () => { state.calMode = "week"; state.weekMonday = mondayOf(state.weekMonday || new Date()); await openWeek(); });
+  $("calDay")?.addEventListener("click", async () => { state.calMode = "day"; await openWeek(); });
+  $("planHoursBtn")?.addEventListener("click", async () => { state.hoursMode = !state.hoursMode; await openWeek(); });
   $("weekPrev").addEventListener("click", async () => {
     if (!state.weekMonday) state.weekMonday = mondayOf(new Date());
-    state.weekMonday = addDays(state.weekMonday, -7);
+    if (state.calMode === "month") state.weekMonday = new Date(state.weekMonday.getFullYear(), state.weekMonday.getMonth() - 1, 1);
+    else state.weekMonday = addDays(state.weekMonday, state.calMode === "day" ? -1 : -7);
     await openWeek();
   });
   $("weekNext").addEventListener("click", async () => {
     if (!state.weekMonday) state.weekMonday = mondayOf(new Date());
-    state.weekMonday = addDays(state.weekMonday, 7);
+    if (state.calMode === "month") state.weekMonday = new Date(state.weekMonday.getFullYear(), state.weekMonday.getMonth() + 1, 1);
+    else state.weekMonday = addDays(state.weekMonday, state.calMode === "day" ? 1 : 7);
     await openWeek();
   });
   $("weekToday").addEventListener("click", async () => {
-    state.weekMonday = mondayOf(new Date());
+    state.weekMonday = state.calMode === "day" ? new Date() : mondayOf(new Date());
     await openWeek();
   });
   $("weekView").addEventListener("click", (e) => {
@@ -3146,24 +3298,34 @@ const JOBS = (() => {
     e.preventDefault();
     $("labourError").hidden = true;
     try {
-      const ids = [...document.querySelectorAll("#employeeChecks input:checked")].map((i) => i.value);
-      if (!ids.length) throw new Error("Select at least one employee");
       const start = parseClock($("labourStart").value);
       const finish = parseClock($("labourFinish").value);
       const note = $("labourNote").value.trim() || null;
       const date = $("labourDate").value;
-      for (const employee_id of ids) {
-        const emp = state.employees.find((x) => x.id === employee_id);
-        await rest("POST", "labour_entries", { body: {
-          job_id: state.currentJob.id,
-          task_id: state.currentTask.id,
-          employee_id,
-          who: emp?.name || "",
-          work_date: date,
-          start_minutes: start,
-          finish_minutes: finish,
-          task: note,
-        }});
+      if (state.editLabourId) {
+        await rest("PATCH", "labour_entries", {
+          query: `?id=eq.${state.editLabourId}`,
+          body: { work_date: date, start_minutes: start, finish_minutes: finish, task: note },
+        });
+        state.editLabourId = null;
+        $("labourSave").textContent = "Add labour";
+        $("labourCancel").hidden = true;
+      } else {
+        const ids = [...document.querySelectorAll("#employeeChecks input:checked")].map((i) => i.value);
+        if (!ids.length) throw new Error("Select at least one employee");
+        for (const employee_id of ids) {
+          const emp = state.employees.find((x) => x.id === employee_id);
+          await rest("POST", "labour_entries", { body: {
+            job_id: state.currentJob.id,
+            task_id: state.currentTask.id,
+            employee_id,
+            who: emp?.name || "",
+            work_date: date,
+            start_minutes: start,
+            finish_minutes: finish,
+            task: note,
+          }});
+        }
       }
       $("labourNote").value = "";
       document.querySelectorAll("#employeeChecks input").forEach((i) => { i.checked = false; });
@@ -3171,6 +3333,61 @@ const JOBS = (() => {
     } catch (err) {
       $("labourError").textContent = err.message;
       $("labourError").hidden = false;
+    }
+  });
+  $("labourCancel")?.addEventListener("click", () => {
+    state.editLabourId = null;
+    $("labourSave").textContent = "Add labour";
+    $("labourCancel").hidden = true;
+  });
+  $("labourBody")?.addEventListener("click", (e) => {
+    const row = e.target.closest("tr[data-labour]");
+    if (!row) return;
+    state.editLabourId = row.dataset.labour;
+    $("labourDate").value = row.children[1].textContent;
+    if (row.children[2].textContent !== "—") $("labourStart").value = row.children[2].textContent;
+    if (row.children[3].textContent !== "—") $("labourFinish").value = row.children[3].textContent;
+    $("labourNote").value = row.children[5].textContent;
+    document.querySelectorAll("#employeeChecks input").forEach((i) => { i.checked = i.value === row.dataset.emp; });
+    $("labourSave").textContent = "Save hours";
+    $("labourCancel").hidden = false;
+  });
+  $("labourBody")?.addEventListener("dblclick", async (e) => {
+    const row = e.target.closest("tr[data-labour]");
+    if (!row) return;
+    if (!window.confirm("Remove this time?")) return;
+    $("labourError").hidden = true;
+    try {
+      await rest("DELETE", "labour_entries", { query: `?id=eq.${row.dataset.labour}` });
+      state.editLabourId = null;
+      $("labourSave").textContent = "Add labour";
+      $("labourCancel").hidden = true;
+      await loadTaskLines();
+    } catch (err) {
+      $("labourError").textContent = err.message;
+      $("labourError").hidden = false;
+    }
+  });
+  $("materialBody")?.addEventListener("dblclick", async (e) => {
+    const row = e.target.closest("tr[data-mat]");
+    if (!row || !window.confirm("Remove this material?")) return;
+    try {
+      await rest("DELETE", "material_entries", { query: `?id=eq.${row.dataset.mat}` });
+      await loadTaskLines();
+    } catch (err) {
+      $("materialError").textContent = err.message;
+      $("materialError").hidden = false;
+    }
+  });
+  $("equipmentBody")?.addEventListener("dblclick", async (e) => {
+    const row = e.target.closest("tr[data-eq]");
+    if (!row || !window.confirm("Remove this plant?")) return;
+    try {
+      await rest("DELETE", "equipment_entries", { query: `?id=eq.${row.dataset.eq}` });
+      await loadTaskLines();
+    } catch (err) {
+      $("equipmentError").textContent = err.message;
+      $("equipmentError").hidden = false;
     }
   });
 
@@ -3310,7 +3527,7 @@ const JOBS = (() => {
     state, rest, $, isOffice, show, setTab, views, dollars, toCents, escapeHtml,
     isoDate, loadJobs, openJob, loadPack, loadJobSummary, loadTasks, loadCustomers,
     loadTemplates, ensureSite, findCustomerByName, ensureCustomer, hhmm,
-    applyTemplate, personChargeCents, centsFromMinutes, statusLabel,
+    applyTemplate, personChargeCents, centsFromMinutes, statusLabel, loadCatalogue,
   };
 
   boot();
@@ -3371,7 +3588,7 @@ window.JobsMoney = function JobsMoney(api) {
   async function loadQuotes() {
     if (!isOffice()) return;
     state.quotes = await rest("GET", "quotes", {
-      query: "?select=*,jobs(id,number,title,customer_id,site_id,customers(name),sites(address,label))&order=created_at.desc",
+      query: "?is_current=eq.true&select=*,jobs(id,number,title,customer_id,site_id,customers(name),sites(address,label))&order=created_at.desc",
     });
     const ids = state.quotes.map((q) => q.id);
     let lines = [];
@@ -3389,7 +3606,7 @@ window.JobsMoney = function JobsMoney(api) {
       return blob.includes(q);
     });
     $("quoteList").innerHTML = rows.map((x) => `<tr data-qid="${x.id}">
-      <td class="num">${escapeHtml(x.number)}</td>
+      <td class="num">${escapeHtml(x.number)} · Rev ${escapeHtml(x.revision || "A")}</td>
       <td>${escapeHtml(x.jobs?.title || "")}</td>
       <td>${escapeHtml(x.jobs?.customers?.name || "")}</td>
       <td>${escapeHtml(quoteStatusLabel(x.status))}</td>
@@ -3406,11 +3623,13 @@ window.JobsMoney = function JobsMoney(api) {
     if (!state.currentQuote) return;
     await loadQuoteLines();
     const q = state.currentQuote;
-    $("quoteHead").textContent = `${q.number} · ${q.jobs?.title || ""}`;
+    $("quoteHead").textContent = `${q.number} · Rev ${q.revision || "A"} · ${q.jobs?.title || ""}`;
     $("quoteMeta").textContent = [q.jobs?.customers?.name, q.jobs?.sites?.address, q.jobs?.number].filter(Boolean).join(" · ");
     $("quoteStatus").value = q.status;
     $("quoteExpiry").value = q.expires_on || "";
     $("quoteError").hidden = true;
+    if ($("quoteLineForm")) $("quoteLineForm").hidden = q.status !== "draft";
+    if ($("reviseQuote")) $("reviseQuote").hidden = q.status === "draft";
     show("quoteView");
     setTab("quotes");
   }
@@ -3848,7 +4067,12 @@ window.JobsMoney = function JobsMoney(api) {
       else await rest("POST", "job_task_amounts", { body: { task_id: taskId, amount_cents: amt } });
     }
     await rest("PATCH", "jobs", { query: `?id=eq.${jobId}`, body: { status: "quoted", model: "quoted", quoted_amount_cents: ex } });
-  }
+    const dlg = $("scheduleAfterQuote");
+    if (dlg) {
+    $("acceptSchedule").value = isoDate(new Date());
+    dlg.showModal();
+    }
+    }
 
   function setJobsViewMoney(name) {
     const list = $("jobsListPane");
@@ -3870,7 +4094,30 @@ window.JobsMoney = function JobsMoney(api) {
   api.refreshMoney = async function refreshMoney() {
     if (!isOffice() || !state.currentJob) return;
     try { await loadOpenLines(); } catch (err) { console.warn(err); }
+    try { await fillMoneyStrip(); } catch (err) { console.warn(err); }
   };
+
+  async function fillMoneyStrip() {
+    const el = $("jobMoneyStrip");
+    const next = $("jobNext");
+    if (!el || !isOffice() || !state.currentJob) return;
+    const jid = state.currentJob.id;
+    const quoted = Number(state.currentJob.quoted_amount_cents) || 0;
+    const claims = await rest("GET", "claims", { query: `?job_id=eq.${jid}&status=eq.issued&select=id` });
+    let claimed = 0;
+    if (claims.length) {
+      const lines = await rest("GET", "claim_lines", { query: `?claim_id=in.(${claims.map((c) => c.id).join(",")})&select=qty,unit_amount_cents` });
+      claimed = lines.reduce((a, l) => a + lineEx(l), 0);
+    }
+    const left = Math.max(0, quoted - claimed);
+    el.hidden = false;
+    el.textContent = `Quoted · Claimed · Left  $${dollars(quoted)} · $${dollars(claimed)} · $${dollars(left)}`;
+    if (next) {
+      if (!state.currentJob.scheduled_on) next.textContent = "Next: set a date";
+      else if (left > 0) next.textContent = "Next: make a claim for what is finished";
+      else next.textContent = "Next: pack is the last check, then you are done";
+    }
+  }
 
   $("newQuoteBtn")?.addEventListener("click", async () => {
     await loadCustomers();
@@ -3969,6 +4216,50 @@ window.JobsMoney = function JobsMoney(api) {
     } catch (err) {
       $("quoteError").textContent = err.message;
       $("quoteError").hidden = false;
+    }
+  });
+  $("reviseQuote")?.addEventListener("click", async () => {
+    $("quoteError").hidden = true;
+    try {
+      const src = state.currentQuote;
+      if (src.status === "draft") throw new Error("Edit the draft. Revise after you send it.");
+      const next = String.fromCharCode(((src.revision || "A").charCodeAt(0)) + 1);
+      await rest("PATCH", "quotes", { query: `?id=eq.${src.id}`, body: { is_current: false } });
+      const created = await rest("POST", "quotes", { body: {
+        job_id: src.job_id,
+        number: src.number,
+        revision: next,
+        is_current: true,
+        status: "draft",
+        issued_on: isoDate(new Date()),
+        expires_on: addDaysIso(isoDate(new Date()), 30),
+      }});
+      for (const l of state.quoteLines) {
+        await rest("POST", "quote_lines", { body: {
+          quote_id: created[0].id,
+          title: l.title,
+          description: l.description,
+          qty: l.qty,
+          unit_amount_cents: l.unit_amount_cents,
+          sort_order: l.sort_order,
+          task_id: l.task_id,
+        }});
+      }
+      await openQuote(created[0].id);
+    } catch (err) {
+      $("quoteError").textContent = err.message;
+      $("quoteError").hidden = false;
+    }
+  });
+  $("scheduleAfterQuoteForm")?.addEventListener("submit", async (e) => {
+    const go = e.submitter && e.submitter.id === "acceptScheduleOk";
+    if (go && $("acceptSchedule").value && state.currentQuote?.job_id) {
+      e.preventDefault();
+      await rest("PATCH", "jobs", {
+        query: `?id=eq.${state.currentQuote.job_id}`,
+        body: { scheduled_on: $("acceptSchedule").value, status: "scheduled" },
+      });
+      $("scheduleAfterQuote").close();
     }
   });
   $("dupQuote")?.addEventListener("click", async () => {
@@ -4237,6 +4528,355 @@ window.JobsMoney = function JobsMoney(api) {
 };
 
 if (window.JOBS_API) window.JobsMoney(window.JOBS_API);
+
+window.JobsPO = function JobsPO(api) {
+  const {
+    state, rest, $, isOffice, show, setTab, views, dollars, toCents, escapeHtml,
+    isoDate, loadJobs, openJob, loadTasks, loadCatalogue, hhmm,
+  } = api;
+
+  ["poView", "pickUpView"].forEach((id) => {
+    if (!views.includes(id)) views.push(id);
+  });
+
+  state.currentPo = null;
+  state.poLines = [];
+  state.billDraft = [];
+
+  function poStatusLabel(s) {
+    return ({ draft: "Draft", sent: "Sent", received: "Received", billed: "Billed" })[s] || s;
+  }
+
+  async function loadPos() {
+    if (!state.currentJob) return;
+    const rows = await rest("GET", "purchase_orders", {
+      query: `?job_id=eq.${state.currentJob.id}&select=*&order=created_at.desc`,
+    });
+    const tasks = state.currentJobTasks || [];
+    if ($("poTask")) {
+      $("poTask").innerHTML = tasks.map((t) => `<option value="${t.id}">${escapeHtml(t.number)} · ${escapeHtml(t.title)}</option>`).join("")
+        || `<option value="">Task</option>`;
+    }
+    if ($("poBody")) {
+      $("poBody").innerHTML = rows.map((p) => `<tr data-poid="${p.id}">
+        <td class="num">${escapeHtml(p.number)}</td>
+        <td>${escapeHtml(p.supplier_name || "")}</td>
+        <td>${escapeHtml(poStatusLabel(p.status))}</td>
+        <td></td>
+      </tr>`).join("") || `<tr><td colspan="4">No orders</td></tr>`;
+    }
+  }
+
+  async function openPo(id) {
+    const rows = await rest("GET", "purchase_orders", { query: `?id=eq.${id}&select=*` });
+    state.currentPo = rows[0];
+    if (!state.currentPo) return;
+    $("poHead").textContent = "Purchase order";
+    $("poNumber").textContent = state.currentPo.number;
+    $("poMeta").textContent = [state.currentPo.supplier_name, poStatusLabel(state.currentPo.status), state.currentJob?.number].filter(Boolean).join(" · ");
+    $("poError").hidden = true;
+    if (!state.materialCat?.length) await loadCatalogue();
+    $("poLineCat").innerHTML = `<option value="">Ad-hoc</option>` + (state.materialCat || []).map((r) =>
+      `<option value="${r.id}" data-name="${escapeHtml(r.name)}">${escapeHtml(r.name)}</option>`).join("");
+    await loadPoLines();
+    const draft = state.currentPo.status === "draft";
+    $("poLineForm").hidden = !draft;
+    $("delPo").hidden = !draft;
+    $("pickUpBill").hidden = !isOffice();
+    show("poView");
+    setTab("jobs");
+  }
+
+  async function loadPoLines() {
+    const pid = state.currentPo.id;
+    state.poLines = await rest("GET", "purchase_order_lines", {
+      query: `?po_id=eq.${pid}&select=*&order=sort_order.asc,created_at.asc`,
+    });
+    let costs = {};
+    if (isOffice() && state.poLines.length) {
+      const ids = state.poLines.map((l) => l.id).join(",");
+      const rows = await rest("GET", "purchase_order_line_costs", { query: `?po_line_id=in.(${ids})&select=*` });
+      costs = Object.fromEntries(rows.map((r) => [r.po_line_id, r]));
+    }
+    $("poLineBody").innerHTML = state.poLines.map((l) => {
+      const c = costs[l.id];
+      const unit = c?.invoiced_unit_cost_cents ?? c?.unit_cost_cents;
+      const draft = state.currentPo.status === "draft";
+      return `<tr>
+        <td>${escapeHtml(l.description)}</td>
+        <td>${l.qty}</td>
+        <td class="office-only">${dollars(unit)}</td>
+        <td>${draft ? `<button type="button" class="ghost" data-delpoline="${l.id}">Remove</button>` : ""}</td>
+      </tr>`;
+    }).join("") || `<tr><td colspan="4">No lines</td></tr>`;
+  }
+
+  async function receivePo() {
+    const po = state.currentPo;
+    await loadPoLines();
+    for (const l of state.poLines) {
+      if (l.material_id) continue;
+      const created = await rest("POST", "material_entries", { body: {
+        job_id: po.job_id,
+        task_id: l.task_id || po.task_id,
+        catalogue_id: l.catalogue_id || null,
+        description: l.description,
+        qty: l.received_qty || l.qty,
+      }});
+      await rest("PATCH", "purchase_order_lines", { query: `?id=eq.${l.id}`, body: { material_id: created[0].id, received_qty: l.qty } });
+      if (isOffice()) {
+        const costs = await rest("GET", "purchase_order_line_costs", { query: `?po_line_id=eq.${l.id}&select=*` });
+        const unit = costs[0]?.invoiced_unit_cost_cents ?? costs[0]?.unit_cost_cents;
+        if (unit != null) {
+          const existing = await rest("GET", "material_costs", { query: `?material_id=eq.${created[0].id}&select=material_id` });
+          if (existing.length) await rest("PATCH", "material_costs", { query: `?material_id=eq.${created[0].id}`, body: { unit_cost_cents: unit } });
+          else await rest("POST", "material_costs", { body: { material_id: created[0].id, unit_cost_cents: unit } });
+        }
+      }
+    }
+    await rest("PATCH", "purchase_orders", { query: `?id=eq.${po.id}`, body: { status: "received" } });
+    await openPo(po.id);
+  }
+
+  function latin1(bytes) {
+    let s = "";
+    for (let i = 0; i < bytes.length; i++) s += String.fromCharCode(bytes[i]);
+    return s;
+  }
+
+  async function inflate(bytes) {
+    for (const format of ["deflate", "deflate-raw"]) {
+      try {
+        const ds = new DecompressionStream(format);
+        const stream = new Blob([bytes]).stream().pipeThrough(ds);
+        return new Uint8Array(await new Response(stream).arrayBuffer());
+      } catch { /* try next */ }
+    }
+    return bytes;
+  }
+
+  function pdfStrings(raw) {
+    const out = [];
+    const re = /\((?:\\.|[^\\)])*\)/g;
+    let m;
+    while ((m = re.exec(raw))) {
+      let t = m[0].slice(1, -1);
+      t = t.replace(/\\n/g, " ").replace(/\\r/g, " ").replace(/\\\(/g, "(").replace(/\\\)/g, ")").replace(/\\\\/g, "\\");
+      t = t.replace(/\\(\d{1,3})/g, (_, n) => String.fromCharCode(parseInt(n, 8)));
+      if (t.trim()) out.push(t);
+    }
+    return out;
+  }
+
+  async function pdfToText(file) {
+    const buf = new Uint8Array(await file.arrayBuffer());
+    const raw = latin1(buf);
+    const chunks = [];
+    const streamRe = /stream\r?\n([\s\S]*?)\r?\nendstream/g;
+    let m;
+    while ((m = streamRe.exec(raw))) {
+      const head = raw.slice(Math.max(0, m.index - 400), m.index);
+      const payload = m[1];
+      let bytes = new Uint8Array(payload.length);
+      for (let i = 0; i < payload.length; i++) bytes[i] = payload.charCodeAt(i) & 255;
+      if (/FlateDecode/.test(head)) bytes = await inflate(bytes);
+      chunks.push(latin1(bytes));
+    }
+    const text = [raw, ...chunks].map((c) => pdfStrings(c).join(" ")).join("\n");
+    return text.replace(/\s+/g, " ").trim();
+  }
+
+  function parseBillText(text, poNumber) {
+    const foundPo = (text.match(/PO-\d+/i) || [])[0] || "";
+    const inv = (text.match(/(?:inv(?:oice)?\s*(?:no\.?|number|#)\s*[:#]?\s*)([A-Z0-9\-\/]+)/i) || [])[1] || "";
+    const money = [...text.matchAll(/\$?\s*([0-9]{1,6}(?:\.[0-9]{2}))/g)].map((x) => Math.round(Number(x[1]) * 100));
+    const lines = [];
+    for (const l of state.poLines) {
+      const hit = text.toLowerCase().includes(String(l.description || "").toLowerCase().slice(0, 12));
+      lines.push({
+        po_line_id: l.id,
+        description: l.description,
+        qty: l.qty,
+        unit_cost_cents: hit && money.length ? money[Math.min(money.length - 1, lines.length)] : 0,
+      });
+    }
+    if (!lines.length && money.length) {
+      lines.push({ po_line_id: null, description: "Invoice total", qty: 1, unit_cost_cents: money[money.length - 1] });
+    }
+    return { foundPo, inv, text, lines, poOk: !foundPo || foundPo.toUpperCase() === String(poNumber).toUpperCase() };
+  }
+
+  api.loadPos = loadPos;
+  api.openPo = openPo;
+
+  $("poBody")?.addEventListener("click", (e) => {
+    const row = e.target.closest("tr[data-poid]");
+    if (row) openPo(row.dataset.poid);
+  });
+  $("newPoForm")?.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    $("poListError").hidden = true;
+    try {
+      const created = await rest("POST", "purchase_orders", { body: {
+        job_id: state.currentJob.id,
+        task_id: $("poTask").value || null,
+        number: "",
+        status: "draft",
+        supplier_name: $("poSupplier").value.trim() || null,
+      }});
+      $("poSupplier").value = "";
+      await openPo(created[0].id);
+    } catch (err) {
+      $("poListError").textContent = err.message;
+      $("poListError").hidden = false;
+    }
+  });
+  $("backToPoJob")?.addEventListener("click", async () => {
+    await openJob(state.currentJob.id, "work");
+  });
+  $("poLineForm")?.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    try {
+      const cat = $("poLineCat");
+      const opt = cat.selectedOptions[0];
+      const desc = $("poLineDesc").value.trim() || opt?.dataset.name || "";
+      const created = await rest("POST", "purchase_order_lines", { body: {
+        po_id: state.currentPo.id,
+        task_id: state.currentPo.task_id,
+        catalogue_id: cat.value || null,
+        description: desc,
+        qty: Number($("poLineQty").value) || 1,
+        sort_order: state.poLines.length,
+      }});
+      if (isOffice() && $("poLineCost").value) {
+        await rest("POST", "purchase_order_line_costs", {
+          body: { po_line_id: created[0].id, unit_cost_cents: toCents($("poLineCost").value) },
+        });
+      }
+      $("poLineDesc").value = "";
+      $("poLineCost").value = "";
+      await loadPoLines();
+    } catch (err) {
+      $("poError").textContent = err.message;
+      $("poError").hidden = false;
+    }
+  });
+  $("poLineCat")?.addEventListener("change", () => {
+    const opt = $("poLineCat").selectedOptions[0];
+    if (opt?.dataset.name) $("poLineDesc").value = opt.dataset.name;
+  });
+  $("poLineBody")?.addEventListener("click", async (e) => {
+    const btn = e.target.closest("[data-delpoline]");
+    if (!btn) return;
+    await rest("DELETE", "purchase_order_lines", { query: `?id=eq.${btn.dataset.delpoline}` });
+    await loadPoLines();
+  });
+  $("markPoSent")?.addEventListener("click", async () => {
+    await rest("PATCH", "purchase_orders", { query: `?id=eq.${state.currentPo.id}`, body: { status: "sent" } });
+    await openPo(state.currentPo.id);
+  });
+  $("markPoReceived")?.addEventListener("click", async () => {
+    try { await receivePo(); } catch (err) {
+      $("poError").textContent = err.message;
+      $("poError").hidden = false;
+    }
+  });
+  $("delPo")?.addEventListener("click", async () => {
+    if (state.currentPo.status !== "draft") return;
+    if (!window.confirm("Delete this order?")) return;
+    await rest("DELETE", "purchase_orders", { query: `?id=eq.${state.currentPo.id}` });
+    await openJob(state.currentJob.id, "work");
+  });
+  $("pickUpBill")?.addEventListener("click", async () => {
+    await loadPoLines();
+    state.billDraft = state.poLines.map((l) => ({ po_line_id: l.id, description: l.description, qty: l.qty, unit_cost_cents: 0 }));
+    $("billInvNo").value = state.currentPo.supplier_invoice_number || "";
+    $("billParsed").textContent = "";
+    $("billError").hidden = true;
+    renderBillDraft();
+    show("pickUpView");
+  });
+  $("backToPo")?.addEventListener("click", () => openPo(state.currentPo.id));
+
+  function renderBillDraft() {
+    $("billLineBody").innerHTML = state.billDraft.map((l, i) => `<tr>
+      <td>${escapeHtml(l.description)}</td>
+      <td><input data-billqty="${i}" type="number" min="1" value="${l.qty}" /></td>
+      <td><input data-billcost="${i}" inputmode="decimal" value="${dollars(l.unit_cost_cents)}" /></td>
+    </tr>`).join("") || `<tr><td colspan="3">No lines on the order</td></tr>`;
+  }
+
+  $("billLineBody")?.addEventListener("input", (e) => {
+    const q = e.target.closest("[data-billqty]");
+    const c = e.target.closest("[data-billcost]");
+    if (q) state.billDraft[Number(q.dataset.billqty)].qty = Number(q.value) || 1;
+    if (c) {
+      try { state.billDraft[Number(c.dataset.billcost)].unit_cost_cents = toCents(c.value); } catch { /* keep */ }
+    }
+  });
+
+  $("billPdf")?.addEventListener("change", async () => {
+    $("billError").hidden = true;
+    const file = $("billPdf").files?.[0];
+    if (!file) return;
+    try {
+      const text = await pdfToText(file);
+      const parsed = parseBillText(text, state.currentPo.number);
+      if (parsed.inv) $("billInvNo").value = parsed.inv;
+      if (parsed.lines.length) state.billDraft = parsed.lines.map((l) => ({
+        po_line_id: l.po_line_id,
+        description: l.description,
+        qty: l.qty,
+        unit_cost_cents: l.unit_cost_cents || 0,
+      }));
+      $("billParsed").textContent = parsed.poOk
+        ? (parsed.foundPo ? `Matched ${parsed.foundPo}` : "No PO number on the PDF — check the lines")
+        : `PDF looks like ${parsed.foundPo}, this order is ${state.currentPo.number}`;
+      renderBillDraft();
+    } catch (err) {
+      $("billError").textContent = err.message || "Could not read that file";
+      $("billError").hidden = false;
+    }
+  });
+
+  $("confirmBill")?.addEventListener("click", async () => {
+    $("billError").hidden = true;
+    try {
+      if (!isOffice()) throw new Error("Office only");
+      const po = state.currentPo;
+      for (const l of state.billDraft) {
+        if (!l.po_line_id) continue;
+        const existing = await rest("GET", "purchase_order_line_costs", { query: `?po_line_id=eq.${l.po_line_id}&select=*` });
+        if (existing.length) {
+          await rest("PATCH", "purchase_order_line_costs", {
+            query: `?po_line_id=eq.${l.po_line_id}`,
+            body: { invoiced_unit_cost_cents: l.unit_cost_cents, unit_cost_cents: existing[0].unit_cost_cents || l.unit_cost_cents },
+          });
+        } else {
+          await rest("POST", "purchase_order_line_costs", {
+            body: { po_line_id: l.po_line_id, unit_cost_cents: l.unit_cost_cents, invoiced_unit_cost_cents: l.unit_cost_cents },
+          });
+        }
+        await rest("PATCH", "purchase_order_lines", { query: `?id=eq.${l.po_line_id}`, body: { qty: l.qty } });
+      }
+      await receivePo();
+      await rest("PATCH", "purchase_orders", {
+        query: `?id=eq.${po.id}`,
+        body: {
+          status: "billed",
+          supplier_invoice_number: $("billInvNo").value.trim() || null,
+          billed_on: isoDate(new Date()),
+        },
+      });
+      await openPo(po.id);
+    } catch (err) {
+      $("billError").textContent = err.message;
+      $("billError").hidden = false;
+    }
+  });
+};
+
+if (window.JOBS_API) window.JobsPO(window.JOBS_API);
 
 </script>
 </body>
