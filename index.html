@@ -981,6 +981,7 @@ body.field .office-only { display: none !important; }
         <h1 id="quoteHead"></h1>
         <p class="meta" id="quoteMeta"></p>
         <div class="job-actions">
+          <label>Number<input id="quoteNumber" autocomplete="off" /></label>
           <label>Status
             <select id="quoteStatus">
               <option value="draft">Draft</option>
@@ -1025,6 +1026,8 @@ body.field .office-only { display: none !important; }
         <h1 id="claimHead"></h1>
         <p class="meta" id="claimMeta"></p>
         <div class="job-actions">
+          <label>Number<input id="claimNumber" autocomplete="off" /></label>
+          <button type="button" class="ghost" id="saveClaimNumber">Save number</button>
           <button type="button" class="ghost" id="issueClaim">Issue invoice</button>
           <button type="button" id="exportClaimPdf">Export PDF</button>
           <button type="button" class="ghost" id="delClaim">Delete draft</button>
@@ -3645,6 +3648,7 @@ window.JobsMoney = function JobsMoney(api) {
     const q = state.currentQuote;
     $("quoteHead").textContent = `${q.number} · Rev ${q.revision || "A"} · ${q.jobs?.title || ""}`;
     $("quoteMeta").textContent = [q.jobs?.customers?.name, q.jobs?.sites?.address, q.jobs?.number].filter(Boolean).join(" · ");
+    if ($("quoteNumber")) $("quoteNumber").value = q.number || "";
     $("quoteStatus").value = q.status;
     $("quoteExpiry").value = q.expires_on || "";
     $("quoteError").hidden = true;
@@ -3897,6 +3901,7 @@ window.JobsMoney = function JobsMoney(api) {
     const total = ex + gst;
     const paid = pays.reduce((a, p) => a + p.amount_cents, 0);
     $("claimHead").textContent = `${c.number} · ${c.jobs?.title || ""}`;
+    if ($("claimNumber")) $("claimNumber").value = c.number || "";
     $("claimMeta").textContent = `${c.title || ""} · ${claimPaidLabel(c, ex, paid)}`;
     $("claimTotals").textContent = `Subtotal $${dollars(ex)} · GST 10% $${dollars(gst)} · Total $${dollars(total)}`;
     $("payBody").innerHTML = pays.map((p) => `<tr><td>${escapeHtml(p.paid_on)}</td><td>$${dollars(p.amount_cents)}</td><td>${escapeHtml(p.reference || "")}</td></tr>`).join("") || `<tr><td colspan="3">No payments</td></tr>`;
@@ -4283,13 +4288,19 @@ window.JobsMoney = function JobsMoney(api) {
     $("quoteError").hidden = true;
     try {
       const status = $("quoteStatus").value;
+      const number = ($("quoteNumber")?.value || "").trim();
+      if (!number) throw new Error("Quote needs a number");
       const body = { status, expires_on: $("quoteExpiry").value || null };
       if (status === "sent" && !state.currentQuote.issued_on) body.issued_on = isoDate(new Date());
+      if (number !== state.currentQuote.number) {
+        await rest("PATCH", "quotes", { query: `?number=eq.${encodeURIComponent(state.currentQuote.number)}`, body: { number } });
+        state.currentQuote.number = number;
+      }
       await rest("PATCH", "quotes", { query: `?id=eq.${state.currentQuote.id}`, body });
       if (status === "accepted") await acceptQuote();
       await openQuote(state.currentQuote.id);
     } catch (err) {
-      $("quoteError").textContent = err.message;
+      $("quoteError").textContent = /unique|duplicate/i.test(err.message) ? "That number is already used" : err.message;
       $("quoteError").hidden = false;
     }
   });
@@ -4500,12 +4511,27 @@ window.JobsMoney = function JobsMoney(api) {
   });
   $("backToClaimJob")?.addEventListener("click", () => openJob(state.currentClaim?.job_id || state.currentJob?.id));
   $("exportClaimPdf")?.addEventListener("click", () => exportPaper("invoice"));
-  $("issueClaim")?.addEventListener("click", async () => {
+  $("saveClaimNumber")?.addEventListener("click", async () => {
+    $("claimViewError").hidden = true;
     try {
-      await rest("PATCH", "claims", { query: `?id=eq.${state.currentClaim.id}`, body: { status: "issued" } });
+      const number = ($("claimNumber")?.value || "").trim();
+      if (!number) throw new Error("Invoice needs a number");
+      await rest("PATCH", "claims", { query: `?id=eq.${state.currentClaim.id}`, body: { number } });
       await openClaim(state.currentClaim.id);
     } catch (err) {
-      $("claimViewError").textContent = err.message;
+      $("claimViewError").textContent = /unique|duplicate/i.test(err.message) ? "That number is already used" : err.message;
+      $("claimViewError").hidden = false;
+    }
+  });
+  $("issueClaim")?.addEventListener("click", async () => {
+    try {
+      const number = ($("claimNumber")?.value || "").trim();
+      const body = { status: "issued" };
+      if (number) body.number = number;
+      await rest("PATCH", "claims", { query: `?id=eq.${state.currentClaim.id}`, body });
+      await openClaim(state.currentClaim.id);
+    } catch (err) {
+      $("claimViewError").textContent = /unique|duplicate/i.test(err.message) ? "That number is already used" : err.message;
       $("claimViewError").hidden = false;
     }
   });
