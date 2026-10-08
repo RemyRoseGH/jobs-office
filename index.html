@@ -286,6 +286,32 @@ body.field .office-only { display: none !important; }
 .paper-pay { margin-top: 0; font-size: 13px; }
 .paper-terms { margin-top: 48px; }
 .paper-terms hr { border: none; border-top: 1px solid #111; margin: 6px 0 10px; }
+#paperBar {
+  position: fixed;
+  top: 12px;
+  left: 12px;
+  z-index: 90;
+  display: flex;
+  gap: 8px;
+}
+#paperBar[hidden] { display: none; }
+body.paper-open #paperSheet {
+  position: fixed;
+  inset: 0;
+  left: 0;
+  top: 0;
+  overflow: auto;
+  background: #d2d2d7;
+  z-index: 80;
+  padding: 64px 24px 40px;
+  width: auto;
+}
+body.paper-open .paper {
+  background: #fff;
+  margin: 0 auto;
+  padding: 16mm 16mm 18mm;
+  box-shadow: 0 12px 40px rgba(0,0,0,.16);
+}
 #paperSheet {
   position: absolute;
   left: -9999px;
@@ -294,24 +320,31 @@ body.field .office-only { display: none !important; }
   background: #fff;
 }
 @media print {
-  header, nav, .toolbar, .chips, #loginView, #jobsListPane, #weekView, #weekBar, #invoiceView, #openInvoicesView, #jobView, #taskView, #newJobView, #customersTab, #customerView, #employeesTab, #catalogueTab, #quotesTab, #quoteView, #claimView, #newQuoteView, #templatesTab, #templateView, #poView, #pickUpView, #listError, #quickFilters { display: none !important; }
+  header, nav, .toolbar, .chips, #loginView, #jobsListPane, #weekView, #weekBar, #invoiceView, #openInvoicesView, #jobView, #taskView, #newJobView, #customersTab, #customerView, #employeesTab, #catalogueTab, #quotesTab, #quoteView, #claimView, #newQuoteView, #templatesTab, #templateView, #poView, #pickUpView, #listError, #quickFilters, #paperBar { display: none !important; }
   body:not(.print-paper) #printRun { display: block !important; }
   body.print-paper #printRun { display: none !important; }
-  #paperSheet, body.print-paper #paperSheet {
+  #paperSheet, body.paper-open #paperSheet, body.print-paper #paperSheet {
     display: block !important;
     position: static !important;
     left: auto !important;
+    top: auto !important;
+    inset: auto !important;
     width: auto !important;
-    background: #fff;
+    overflow: visible !important;
+    background: #fff !important;
+    padding: 0 !important;
+    z-index: auto !important;
   }
-  .paper-mark { display: block !important; height: 72px !important; }
-  body.print-paper { background: #fff; }
+  .paper { box-shadow: none !important; max-width: none; }
+  .paper-mark { display: block !important; height: 72px !important; visibility: visible !important; }
+  body.print-paper, body.paper-open { background: #fff; }
   main { max-width: none; margin: 0; }
   @page { size: A4; margin: 12mm 14mm; }
 }
 
 
 </style>
+  <link rel="preload" as="image" href="./letterhead.jpg" />
 </head>
 <body>
   <header class="top">
@@ -1119,6 +1152,10 @@ body.field .office-only { display: none !important; }
       </div>
     </section>
 
+    <div id="paperBar" hidden>
+      <button type="button" id="paperDoPrint">Print</button>
+      <button type="button" class="ghost" id="paperClose">Close</button>
+    </div>
     <section id="paperSheet"></section>
 
     <section id="templateView" hidden>
@@ -1362,7 +1399,7 @@ const JOBS = (() => {
 
   const ROLE_ORDER = ["trade", "apprentice", "supervisor", "project_manager", "subcontractor"];
 
-  const views = ["loginView", "jobsTab", "jobView", "taskView", "newJobView", "customersTab", "customerView", "employeesTab", "employeeView", "ratesView", "catalogueTab", "templatesTab", "templateView", "quotesTab", "newQuoteView", "quoteView", "claimView", "paperSheet", "poView", "pickUpView"];
+  const views = ["loginView", "jobsTab", "jobView", "taskView", "newJobView", "customersTab", "customerView", "employeesTab", "employeeView", "ratesView", "catalogueTab", "templatesTab", "templateView", "quotesTab", "newQuoteView", "quoteView", "claimView", "poView", "pickUpView"];
   function show(id) {
     views.forEach((v) => { const el = $(v); if (el) el.hidden = v !== id; });
   }
@@ -3993,10 +4030,8 @@ window.JobsMoney = function JobsMoney(api) {
     const total = ex + gst;
     const today = doc.issued_on || isoDate(new Date());
     const due = doc.due_on || (kind === "invoice" ? addDaysIso(today, p.payment_terms_days || 14) : "");
-    const logo = window.PAPER_LOGO_DATA || p.logo_data || "";
-    const logoHtml = logo
-      ? `<img class="paper-mark" alt="INLAND ENERGY SERVICES" src="${logo}" />`
-      : `<div class="paper-mark-fallback">${escapeHtml(p.trading_as || "")}</div>`;
+    const logo = "./letterhead.jpg";
+    const logoHtml = `<img class="paper-mark" alt="INLAND ENERGY SERVICES" src="${logo}" />`;
     const co = `<div class="paper-co">
       ${escapeHtml(p.legal_name || "")}<br>
       T/as ${escapeHtml(p.trading_as || "")}<br>
@@ -4127,22 +4162,21 @@ window.JobsMoney = function JobsMoney(api) {
       const running = await runningTotals(state.currentClaim.job_id, state.currentClaim.id);
       sheet.innerHTML = paperBlock("invoice", state.currentClaim, state.claimLines || [], { running });
     }
-    sheet.hidden = false;
-    document.body.classList.add("print-paper");
+    document.body.classList.add("paper-open");
+    $("paperBar").hidden = false;
     const imgs = [...sheet.querySelectorAll("img")];
     await Promise.all(imgs.map((img) => {
       if (img.complete && img.naturalWidth) return Promise.resolve();
-      return img.decode ? img.decode().catch(() => {}) : new Promise((res) => {
+      return new Promise((res) => {
         img.onload = res;
         img.onerror = res;
       });
     }));
-    const done = () => {
-      document.body.classList.remove("print-paper");
-      window.removeEventListener("afterprint", done);
-    };
-    window.addEventListener("afterprint", done);
-    window.print();
+  }
+
+  function closePaper() {
+    document.body.classList.remove("paper-open", "print-paper");
+    $("paperBar").hidden = true;
   }
 
   async function acceptQuote() {
@@ -4416,6 +4450,12 @@ window.JobsMoney = function JobsMoney(api) {
     setTab("quotes");
   });
   $("exportQuotePdf")?.addEventListener("click", () => exportPaper("quote"));
+  $("paperDoPrint")?.addEventListener("click", () => {
+    document.body.classList.add("print-paper");
+    window.print();
+  });
+  $("paperClose")?.addEventListener("click", closePaper);
+  window.addEventListener("afterprint", () => document.body.classList.remove("print-paper"));
   $("openQuoteJob")?.addEventListener("click", () => openJob(state.currentQuote.job_id));
   $("quoteOnJob")?.addEventListener("click", async () => {
     try {
