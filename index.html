@@ -286,15 +286,27 @@ body.field .office-only { display: none !important; }
 .paper-pay { margin-top: 0; font-size: 13px; }
 .paper-terms { margin-top: 48px; }
 .paper-terms hr { border: none; border-top: 1px solid #111; margin: 6px 0 10px; }
-#paperSheet { display: none; }
+#paperSheet {
+  position: absolute;
+  left: -9999px;
+  top: 0;
+  width: 190mm;
+  background: #fff;
+}
 @media print {
   header, nav, .toolbar, .chips, #loginView, #jobsListPane, #weekView, #weekBar, #invoiceView, #openInvoicesView, #jobView, #taskView, #newJobView, #customersTab, #customerView, #employeesTab, #catalogueTab, #quotesTab, #quoteView, #claimView, #newQuoteView, #templatesTab, #templateView, #poView, #pickUpView, #listError, #quickFilters { display: none !important; }
   body:not(.print-paper) #printRun { display: block !important; }
   body.print-paper #printRun { display: none !important; }
-  body.print-paper #paperSheet { display: block !important; }
+  #paperSheet, body.print-paper #paperSheet {
+    display: block !important;
+    position: static !important;
+    left: auto !important;
+    width: auto !important;
+    background: #fff;
+  }
+  .paper-mark { display: block !important; height: 72px !important; }
   body.print-paper { background: #fff; }
   main { max-width: none; margin: 0; }
-  #paperSheet { background: #fff; }
   @page { size: A4; margin: 12mm 14mm; }
 }
 
@@ -1107,7 +1119,7 @@ body.field .office-only { display: none !important; }
       </div>
     </section>
 
-    <section id="paperSheet" hidden></section>
+    <section id="paperSheet"></section>
 
     <section id="templateView" hidden>
       <button type="button" class="link" id="backToTemplates">← Templates</button>
@@ -4108,17 +4120,29 @@ window.JobsMoney = function JobsMoney(api) {
 
   async function exportPaper(kind) {
     await loadPaper();
+    const sheet = $("paperSheet");
     if (kind === "quote") {
-      $("paperSheet").innerHTML = paperBlock("quote", state.currentQuote, state.quoteLines);
+      sheet.innerHTML = paperBlock("quote", state.currentQuote, state.quoteLines);
     } else {
       const running = await runningTotals(state.currentClaim.job_id, state.currentClaim.id);
-      $("paperSheet").innerHTML = paperBlock("invoice", state.currentClaim, state.claimLines || [], { running });
+      sheet.innerHTML = paperBlock("invoice", state.currentClaim, state.claimLines || [], { running });
     }
+    sheet.hidden = false;
     document.body.classList.add("print-paper");
-    $("paperSheet").hidden = false;
+    const imgs = [...sheet.querySelectorAll("img")];
+    await Promise.all(imgs.map((img) => {
+      if (img.complete && img.naturalWidth) return Promise.resolve();
+      return img.decode ? img.decode().catch(() => {}) : new Promise((res) => {
+        img.onload = res;
+        img.onerror = res;
+      });
+    }));
+    const done = () => {
+      document.body.classList.remove("print-paper");
+      window.removeEventListener("afterprint", done);
+    };
+    window.addEventListener("afterprint", done);
     window.print();
-    document.body.classList.remove("print-paper");
-    $("paperSheet").hidden = true;
   }
 
   async function acceptQuote() {
