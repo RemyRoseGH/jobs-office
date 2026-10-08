@@ -319,8 +319,30 @@ body.paper-open .paper {
   width: 190mm;
   background: #fff;
 }
+.etr-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.etr-table th { font-size: 11px; color: var(--muted); text-align: left; padding: 6px 4px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+.etr-table td { padding: 4px; border-bottom: 1px solid var(--line); vertical-align: top; }
+.etr-table input, .etr-table select { width: 100%; min-width: 52px; margin: 0; padding: 4px 6px; font-size: 12px; }
+.etr-paper { background: #fff; }
+.etr-sheet {
+  border: 1px solid #111;
+  padding: 8px 10px 10px;
+  margin: 0 0 12px;
+  page-break-after: always;
+  font-size: 11px;
+}
+.etr-sheet h1 { font-size: 14px; margin: 0; letter-spacing: 0; }
+.etr-head { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 6px 12px; margin: 8px 0; }
+.etr-head label { font-size: 10px; color: #555; display: block; }
+.etr-head strong { display: block; min-height: 18px; border-bottom: 1px solid #bbb; font-weight: 600; color: #111; background: #fff; }
+.etr-sheet table { width: 100%; border-collapse: collapse; }
+.etr-sheet th { background: #ececec; color: #333; font-size: 9px; font-weight: 600; padding: 4px; border: 1px solid #bbb; }
+.etr-sheet td { background: #fff; border: 1px solid #bbb; padding: 5px 4px; min-height: 18px; }
+.etr-foot { font-size: 9px; color: #444; margin-top: 8px; }
+body.etr-print #etrPaper { display: block !important; }
+
 @media print {
-  header, nav, .toolbar, .chips, #loginView, #jobsListPane, #weekView, #weekBar, #invoiceView, #openInvoicesView, #jobView, #taskView, #newJobView, #customersTab, #customerView, #employeesTab, #catalogueTab, #quotesTab, #quoteView, #claimView, #newQuoteView, #templatesTab, #templateView, #poView, #pickUpView, #listError, #quickFilters, #paperBar { display: none !important; }
+  header, nav, .toolbar, .chips, #loginView, #jobsListPane, #weekView, #weekBar, #invoiceView, #openInvoicesView, #jobView, #taskView, #newJobView, #customersTab, #customerView, #employeesTab, #catalogueTab, #quotesTab, #quoteView, #claimView, #newQuoteView, #templatesTab, #templateView, #poView, #pickUpView, #testRecordView, #testFolder, #listError, #quickFilters, #paperBar { display: none !important; }
   body:not(.print-paper) #printRun { display: block !important; }
   body.print-paper #printRun { display: none !important; }
   #paperSheet, body.paper-open #paperSheet, body.print-paper #paperSheet {
@@ -340,7 +362,14 @@ body.paper-open .paper {
   body.print-paper, body.paper-open { background: #fff; }
   main { max-width: none; margin: 0; }
   @page { size: A4; margin: 12mm 14mm; }
+  body.etr-print header, body.etr-print nav, body.etr-print #testFolder, body.etr-print #testBack { display: none !important; }
+  body.etr-print #testRecordView, body.etr-print #etrPaper { display: block !important; position: static !important; }
+  body.etr-print .etr-sheet { box-shadow: none; }
+  body.etr-print { background: #fff; }
+  body.etr-print { }
 }
+@page etr { size: A4 landscape; margin: 8mm; }
+body.etr-print .etr-sheet { page: etr; }
 
 
 </style>
@@ -590,6 +619,17 @@ body.paper-open .paper {
             <table>
               <thead><tr><th>What</th><th>Status</th><th class="office-only">Amount</th><th></th></tr></thead>
               <tbody id="varBody"></tbody>
+            </table>
+            <h2>Test records</h2>
+            <p class="hint">Not a CCEW. Lodge the CCEW in eCert within 7 days of the test.</p>
+            <div class="inline">
+              <button type="button" id="newTestRecord">New test record</button>
+              <button type="button" class="ghost office-only" id="setupTestRecord">Set up for site</button>
+            </div>
+            <p class="error" id="testListError" hidden></p>
+            <table>
+              <thead><tr><th>Date</th><th>Board</th><th>Tester</th><th>Status</th></tr></thead>
+              <tbody id="testSessionBody"></tbody>
             </table>
           </div>
         </div>
@@ -1222,6 +1262,167 @@ body.paper-open .paper {
       </div>
     </section>
   </main>
+
+    <section id="testRecordView" hidden>
+      <p><button type="button" class="ghost" id="testBack">Back to job</button></p>
+      <div class="card" id="testFolder">
+        <h1>Test records</h1>
+        <p class="hint">Not a CCEW. Lodge the CCEW in eCert within 7 days of the test.</p>
+        <p class="meta" id="testJobMeta"></p>
+        <p class="error" id="testError" hidden></p>
+        <div class="chips" id="testPaneChips">
+          <button type="button" data-etr-pane="board" class="on">Board</button>
+          <button type="button" data-etr-pane="circuits">Circuits</button>
+          <button type="button" data-etr-pane="rcd">RCD</button>
+          <button type="button" data-etr-pane="review">Review</button>
+        </div>
+        <div class="inline">
+          <label>Board<input id="etrBoardName" placeholder="MSB" /></label>
+          <label>Board loc.<input id="etrBoardLoc" /></label>
+          <label>Supply
+            <select id="etrSupply">
+              <option value="unset">—</option>
+              <option value="1ph">1ph</option>
+              <option value="3ph">3ph</option>
+            </select>
+          </label>
+          <label>Work
+            <select id="etrWork">
+              <option value="">—</option>
+              <option value="new">New</option>
+              <option value="add">Add</option>
+              <option value="alt">Alt</option>
+              <option value="repair">Repair</option>
+            </select>
+          </label>
+          <label>NMI<input id="etrNmi" /></label>
+          <label>Licence<input id="etrLicence" placeholder="Required to Complete" /></label>
+        </div>
+        <div class="inline">
+          <label>Meter 1
+            <select id="etrMeter1"></select>
+          </label>
+          <label>Meter 2
+            <select id="etrMeter2"></select>
+          </label>
+          <button type="button" class="ghost" id="etrAddMeter">Add instrument</button>
+        </div>
+        <div id="etrMeterAdd" class="inline" hidden>
+          <input id="etrMeterMake" placeholder="Make / model" />
+          <input id="etrMeterSerial" placeholder="Serial" />
+          <input id="etrMeterFn" placeholder="IR / loop / RCD" />
+          <input id="etrMeterCal" type="date" />
+          <button type="button" id="etrMeterSave">Save instrument</button>
+        </div>
+        <div data-etr-page="board">
+          <h2>Board tests</h2>
+          <table class="etr-table">
+            <thead><tr><th>Test</th><th>Result</th><th>P / F / NA</th><th>Notes</th></tr></thead>
+            <tbody id="etrBoardBody"></tbody>
+          </table>
+        </div>
+        <div data-etr-page="circuits" hidden>
+          <h2>Circuits</h2>
+          <p class="hint">Import is not wired yet — no switchboard schedule on the job. Add rows here.</p>
+          <div class="inline">
+            <input id="etrCctNo" placeholder="CCT" />
+            <input id="etrCctDesc" placeholder="Description" />
+            <select id="etrCctPhase">
+              <option value="unset">PH</option>
+              <option value="A">A</option>
+              <option value="B">B</option>
+              <option value="C">C</option>
+              <option value="ABC">ABC</option>
+            </select>
+            <select id="etrCableType">
+              <option value="TPS">TPS</option>
+              <option value="SDI">SDI</option>
+              <option value="Orange circular">Orange circular</option>
+              <option value="other">Other</option>
+            </select>
+            <select id="etrCableCores">
+              <option value="2C+E">2C+E</option>
+              <option value="4C+E">4C+E</option>
+              <option value="SDI set">SDI set</option>
+            </select>
+            <select id="etrCableSize"></select>
+            <input id="etrCableOther" placeholder="A / N / E" hidden />
+            <select id="etrDevice"></select>
+            <input id="etrDeviceOther" placeholder="Device" hidden />
+            <button type="button" id="etrAddCircuit">Add circuit</button>
+            <button type="button" class="ghost" id="etrCopyCircuit">Copy last</button>
+          </div>
+          <div class="jobs-scroll">
+            <table class="etr-table">
+              <thead>
+                <tr>
+                  <th>CCT</th><th>Description</th><th>PH</th><th>Cable A / N / E mm²</th><th>Device</th>
+                  <th>Earth Ω</th><th>IR MΩ</th><th>Zs Ω</th><th>POL</th><th>CONN</th><th>LIVE Zs?</th><th>P/F NA</th><th>RCD ID</th><th></th>
+                </tr>
+              </thead>
+              <tbody id="etrCircuitBody"></tbody>
+            </table>
+          </div>
+        </div>
+        <div data-etr-page="rcd" hidden>
+          <h2>RCD</h2>
+          <div class="inline">
+            <input id="etrRcdId" placeholder="RCD ID" />
+            <input id="etrRcdCct" placeholder="CCT" />
+            <input id="etrRcdDesc" placeholder="Description / circuits protected" />
+            <select id="etrRcdType">
+              <option value="unset">Type</option>
+              <option value="AC">AC</option>
+              <option value="A">A</option>
+              <option value="F">F</option>
+              <option value="B">B</option>
+              <option value="S">S</option>
+            </select>
+            <input id="etrRcdPoles" inputmode="numeric" placeholder="Poles" />
+            <input id="etrRcdIn" inputmode="decimal" placeholder="In A" />
+            <input id="etrRcdIdn" inputmode="decimal" placeholder="IΔn mA" />
+            <button type="button" id="etrAddRcd">Add RCD</button>
+          </div>
+          <div class="jobs-scroll">
+            <table class="etr-table">
+              <thead>
+                <tr>
+                  <th>RCD ID</th><th>CCT</th><th>Description</th><th>Type</th><th>Poles</th><th>In A</th><th>IΔn mA</th>
+                  <th>T-BTN</th><th>0.5× NO TRIP</th><th>1× 0° ms</th><th>1× 180° ms</th><th>5× 0° ms</th><th>5× 180° ms</th>
+                  <th>POLES OPEN</th><th>P/F NA</th><th></th>
+                </tr>
+              </thead>
+              <tbody id="etrRcdBody"></tbody>
+            </table>
+          </div>
+        </div>
+        <div data-etr-page="review" hidden>
+          <h2>Defects / retest</h2>
+          <form id="etrDefectForm" class="inline">
+            <input id="etrDefectText" placeholder="What failed, what was fixed" required />
+            <button type="submit">Add defect</button>
+          </form>
+          <ul id="etrDefectList"></ul>
+          <h2>eCert</h2>
+          <p class="hint">No submit from Jobs. Paste the CCEW number after you lodge it yourselves.</p>
+          <div class="inline">
+            <select id="etrEcertStatus">
+              <option value="not_ready">Not ready</option>
+              <option value="ready">Ready</option>
+              <option value="lodged_externally">Lodged outside app</option>
+            </select>
+            <input id="etrCcewRef" placeholder="CCEW ref" />
+            <button type="button" class="ghost" id="etrSaveEcert">Save</button>
+          </div>
+          <div class="inline">
+            <button type="button" id="etrComplete">Complete</button>
+            <button type="button" class="ghost" id="etrExportPdf">Export PDF</button>
+            <button type="button" class="ghost office-only" id="etrVoid">Void</button>
+          </div>
+        </div>
+      </div>
+      <div id="etrPaper" class="etr-paper" hidden></div>
+    </section>
 
   <dialog id="newCustomerDialog">
     <form method="dialog" class="card" id="newCustomerDialogForm">
@@ -5042,6 +5243,739 @@ window.JobsPO = function JobsPO(api) {
 };
 
 if (window.JOBS_API) window.JobsPO(window.JOBS_API);
+
+window.JobsTestRecord = function JobsTestRecord(api) {
+  const { state, rest, $, isOffice, show, views, escapeHtml, openJob } = api;
+  if (!views.includes("testRecordView")) views.push("testRecordView");
+
+  const BOARD_KEYS = [
+    { key: "deenergised_proved", label: "De-energised proved before dead tests", num: false },
+    { key: "main_earth_ohm", label: "Main earthing conductor continuity (Ω)", num: true },
+    { key: "men_visual", label: "MEN link in place (visual)", num: false },
+    { key: "earth_electrode", label: "Earth electrode / main earth connection", num: true },
+    { key: "bonding_ohm", label: "Equipotential bonding continuity (Ω)", num: true },
+    { key: "mains_polarity", label: "Consumers mains polarity", num: false },
+    { key: "phase_sequence", label: "Phase sequence (3-phase only)", num: false },
+    { key: "ir_whole_mohm", label: "Insulation resistance — whole board / work (MΩ)", num: true },
+    { key: "ir_test_voltage_v", label: "IR test voltage (V DC)", num: true },
+    { key: "board_visual", label: "Switchboard visual", num: false },
+    { key: "incoming_neutral", label: "Neutral integrity / incoming neutral", num: false },
+  ];
+  const SIZES = ["1.5", "2.5", "4", "6", "10", "16", "25", "35"];
+  const EARTH = { "1.5": "1.5", "2.5": "2.5", "4": "2.5", "6": "2.5", "10": "4", "16": "6", "25": "10", "35": "16" };
+  const DEVICES = [
+    "RCBO C6", "RCBO C10", "RCBO C16", "RCBO C20", "RCBO C25", "RCBO C32", "RCBO C40",
+    "MCB C6", "MCB C10", "MCB C16", "MCB C20", "MCB C25", "MCB C32", "MCB C40", "MCB C50", "MCB C63",
+    "MCB 3P C16", "MCB 3P C20", "MCB 3P C32", "MCB 3P C40", "MCB 3P C50", "MCB 3P C63",
+    "RCCB 40 A 30 mA", "RCCB 63 A 30 mA", "Fuse", "other",
+  ];
+
+  state.testSession = null;
+  state.testBoard = null;
+  state.testCircuits = [];
+  state.testRcds = [];
+  state.testInstruments = [];
+  state.testDefaults = null;
+
+  function err(msg) {
+    const el = $("testError");
+    if (!el) return;
+    if (!msg) { el.hidden = true; el.textContent = ""; return; }
+    el.textContent = msg;
+    el.hidden = false;
+  }
+
+  function outcomeSelect(val) {
+    const v = val || "";
+    return `<select data-outcome>
+      <option value=""${v === "" ? " selected" : ""}></option>
+      <option value="P"${v === "P" ? " selected" : ""}>P</option>
+      <option value="F"${v === "F" ? " selected" : ""}>F</option>
+      <option value="NA"${v === "NA" ? " selected" : ""}>NA</option>
+    </select>`;
+  }
+
+  function cableString(type, cores, size) {
+    const e = EARTH[size] || size;
+    if (cores === "4C+E") return `${size} / ${size} / ${e} 4C+E`;
+    if (cores === "SDI set" || type === "SDI") return `${size} / ${size} / ${e} SDI`;
+    return `${size} / ${size} / ${e}`;
+  }
+
+  function fillCableSizes() {
+    const sel = $("etrCableSize");
+    if (!sel) return;
+    sel.innerHTML = SIZES.map((s) => `<option value="${s}">${s} mm</option>`).join("") + `<option value="other">Other</option>`;
+  }
+
+  function fillDevices() {
+    const sel = $("etrDevice");
+    if (!sel) return;
+    sel.innerHTML = DEVICES.map((d) => `<option value="${escapeHtml(d)}">${escapeHtml(d)}</option>`).join("");
+  }
+
+  async function rpc(name, body) {
+    const res = await fetch(`${CONFIG.url}/rest/v1/rpc/${name}`, {
+      method: "POST",
+      headers: {
+        apikey: CONFIG.anonKey,
+        Authorization: `Bearer ${state.session.access_token}`,
+        "Content-Type": "application/json",
+        Prefer: "return=representation",
+      },
+      body: JSON.stringify(body),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      const msg = data.message || data.hint || data.details || data.error || JSON.stringify(data);
+      throw new Error(msg);
+    }
+    return data;
+  }
+
+  function statusLabel(s) {
+    return ({ setup: "Set up for site", in_progress: "In progress", complete: "Complete", void: "Void" })[s] || s;
+  }
+
+  async function listSessions() {
+    const body = $("testSessionBody");
+    if (!body || !state.currentJob) return;
+    try {
+      const rows = await rest("GET", "test_sessions", {
+        query: `?job_id=eq.${state.currentJob.id}&select=*&order=created_at.desc`,
+      });
+      const boards = rows.length
+        ? await rest("GET", "test_boards", { query: `?session_id=in.(${rows.map((r) => r.id).join(",")})&select=session_id,name` })
+        : [];
+      const byS = {};
+      boards.forEach((b) => { if (!byS[b.session_id]) byS[b.session_id] = b.name; });
+      body.innerHTML = rows.map((r) => {
+        const d = (r.completed_at || r.started_at || "").slice(0, 10);
+        return `<tr data-etr="${r.id}">
+          <td>${escapeHtml(d)}</td>
+          <td>${escapeHtml(byS[r.id] || "")}</td>
+          <td>${escapeHtml(r.tester_name || "")}</td>
+          <td>${escapeHtml(statusLabel(r.status))}</td>
+        </tr>`;
+      }).join("") || `<tr><td colspan="4">No test records</td></tr>`;
+    } catch (e) {
+      if ($("testListError")) {
+        $("testListError").textContent = e.message;
+        $("testListError").hidden = false;
+      }
+    }
+  }
+
+  async function seedBoardRows(boardId) {
+    const existing = await rest("GET", "test_board_rows", { query: `?board_id=eq.${boardId}&select=key` });
+    const have = new Set(existing.map((r) => r.key));
+    const missing = BOARD_KEYS.filter((k) => !have.has(k.key));
+    for (let i = 0; i < missing.length; i += 1) {
+      const k = missing[i];
+      const body = { board_id: boardId, key: k.key, sort_order: BOARD_KEYS.findIndex((x) => x.key === k.key) };
+      if (k.key === "ir_test_voltage_v") body.value_num = 500;
+      await rest("POST", "test_board_rows", { body });
+    }
+  }
+
+  async function createSession(kind) {
+    err("");
+    const job = state.currentJob;
+    const body = {
+      job_id: job.id,
+      status: kind,
+      nmi: job.nmi || null,
+      supply: "unset",
+      tester_user_id: kind === "in_progress" ? state.profile.id : null,
+    };
+    const created = await rest("POST", "test_sessions", { body });
+    const session = created[0];
+    const boards = await rest("POST", "test_boards", { body: { session_id: session.id, name: "MSB" } });
+    await seedBoardRows(boards[0].id);
+    await openSession(session.id);
+  }
+
+  async function openSession(id) {
+    err("");
+    fillCableSizes();
+    fillDevices();
+    const rows = await rest("GET", "test_sessions", { query: `?id=eq.${id}&select=*` });
+    state.testSession = rows[0];
+    if (!state.testSession) throw new Error("Session not found");
+    let boards = await rest("GET", "test_boards", { query: `?session_id=eq.${id}&select=*&order=created_at.asc` });
+    if (!boards.length) {
+      boards = await rest("POST", "test_boards", { body: { session_id: id, name: "MSB" } });
+    }
+    state.testBoard = boards[0];
+    await seedBoardRows(state.testBoard.id);
+    state.testInstruments = await rest("GET", "test_instruments", { query: `?active=eq.true&select=*&order=make_model.asc` });
+    await loadSnaps();
+    const defs = await rest("GET", "test_pass_defaults", { query: `?select=*` });
+    state.testDefaults = defs[0] || { main_earth_ohm_max: 0.5, ir_mohm_min: 1, rcd_1x_ms_flag: 300 };
+    const job = state.currentJob;
+    $("testJobMeta").textContent = `${job.number} · ${job.title} · ${job.customers?.name || ""} · ${job.sites?.address || job.sites?.label || ""}`;
+    $("etrBoardName").value = state.testBoard.name || "";
+    $("etrBoardLoc").value = state.testBoard.location || "";
+    $("etrSupply").value = state.testSession.supply || "unset";
+    $("etrWork").value = state.testSession.work_type || "";
+    $("etrNmi").value = state.testSession.nmi || job.nmi || "";
+    $("etrLicence").value = state.profile.electrical_licence_number || "";
+    renderMeters();
+    await renderBoard();
+    await renderCircuits();
+    await renderRcds();
+    await renderDefects();
+    await renderEcert();
+    const frozen = state.testSession.status === "complete" || state.testSession.status === "void";
+    document.querySelectorAll("#testFolder input, #testFolder select, #testFolder button").forEach((el) => {
+      if (el.id === "testBack" || el.id === "etrExportPdf") return;
+      if (el.id === "etrVoid" && isOffice()) return;
+      if (el.id === "etrSaveEcert") return;
+      if (el.id === "etrEcertStatus" || el.id === "etrCcewRef") return;
+      el.disabled = frozen;
+    });
+    show("testRecordView");
+  }
+
+  function renderMeters() {
+    const snaps = state.testSnaps || [];
+    const m1 = snaps.find((s) => s.role === "meter_1");
+    const m2 = snaps.find((s) => s.role === "meter_2");
+    const opts = `<option value="">—</option>` + state.testInstruments.map((i) => {
+      const due = i.cal_due || "";
+      const expired = due && due < new Date().toISOString().slice(0, 10);
+      return `<option value="${i.id}">${escapeHtml(i.make_model)} ${escapeHtml(i.serial)}${expired ? " (cal due)" : ""}</option>`;
+    }).join("");
+    $("etrMeter1").innerHTML = opts;
+    $("etrMeter2").innerHTML = opts;
+    if (m1?.instrument_id) $("etrMeter1").value = m1.instrument_id;
+    if (m2?.instrument_id) $("etrMeter2").value = m2.instrument_id;
+  }
+
+  async function loadSnaps() {
+    state.testSnaps = await rest("GET", "test_instrument_snapshots", {
+      query: `?session_id=eq.${state.testSession.id}&select=*`,
+    });
+    renderMeters();
+  }
+
+  async function setMeter(role, instrumentId) {
+    if (!instrumentId) return;
+    const inst = state.testInstruments.find((i) => i.id === instrumentId);
+    if (!inst) return;
+    const due = inst.cal_due || "";
+    if (due && due < new Date().toISOString().slice(0, 10)) {
+      err("Instrument cal expired — flagged, not blocked");
+    }
+    const existing = (state.testSnaps || []).find((s) => s.role === role);
+    const body = {
+      session_id: state.testSession.id,
+      instrument_id: inst.id,
+      role,
+      make_model: inst.make_model,
+      serial: inst.serial,
+      cal_due: inst.cal_due,
+    };
+    if (existing) await rest("PATCH", "test_instrument_snapshots", { query: `?id=eq.${existing.id}`, body });
+    else await rest("POST", "test_instrument_snapshots", { body });
+    await loadSnaps();
+  }
+
+  function warnOhm(key, num, outcome) {
+    const d = state.testDefaults || {};
+    if (outcome === "NA" || num == null || Number.isNaN(num)) return "";
+    if (key === "main_earth_ohm" || key === "bonding_ohm") {
+      if (num > Number(d.main_earth_ohm_max || 0.5)) return " flag";
+    }
+    if (key === "ir_whole_mohm" && num < Number(d.ir_mohm_min || 1)) return " flag";
+    return "";
+  }
+
+  async function renderBoard() {
+    const rows = await rest("GET", "test_board_rows", {
+      query: `?board_id=eq.${state.testBoard.id}&select=*&order=sort_order.asc`,
+    });
+    const byKey = Object.fromEntries(rows.map((r) => [r.key, r]));
+    $("etrBoardBody").innerHTML = BOARD_KEYS.map((k) => {
+      const r = byKey[k.key] || {};
+      const flag = warnOhm(k.key, r.value_num == null ? null : Number(r.value_num), r.outcome);
+      return `<tr data-bkey="${k.key}" data-rid="${r.id || ""}">
+        <td>${escapeHtml(k.label)}</td>
+        <td>${k.num ? `<input data-num inputmode="decimal" value="${r.value_num ?? ""}" class="${flag.trim()}" />` : ""}</td>
+        <td>${outcomeSelect(r.outcome)}</td>
+        <td><input data-notes value="${escapeHtml(r.notes || "")}" /></td>
+      </tr>`;
+    }).join("");
+  }
+
+  async function renderCircuits() {
+    const cs = await rest("GET", "test_circuits", {
+      query: `?board_id=eq.${state.testBoard.id}&select=*&order=sort_order.asc`,
+    });
+    state.testCircuits = cs;
+    const ids = cs.map((c) => c.id);
+    const results = ids.length
+      ? await rest("GET", "test_circuit_results", { query: `?circuit_id=in.(${ids.join(",")})&select=*` })
+      : [];
+    const by = Object.fromEntries(results.map((r) => [r.circuit_id, r]));
+    $("etrCircuitBody").innerHTML = cs.map((c) => {
+      const r = by[c.id] || {};
+      return `<tr data-cct="${c.id}">
+        <td>${escapeHtml(c.cct_no)}</td>
+        <td>${escapeHtml(c.description)}</td>
+        <td>${escapeHtml(c.phase === "unset" ? "" : c.phase)}</td>
+        <td>${escapeHtml(c.cable_a_n_e || "")}</td>
+        <td>${escapeHtml(c.device || "")}</td>
+        <td><input data-f="earth_ohm" inputmode="decimal" value="${r.earth_ohm ?? ""}" /></td>
+        <td><input data-f="ir_mohm" inputmode="decimal" value="${r.ir_mohm ?? ""}" /></td>
+        <td><input data-f="zs_ohm" inputmode="decimal" value="${r.zs_ohm ?? ""}" /></td>
+        <td>${outcomeSelect(r.polarity).replace("data-outcome", "data-f=\"polarity\"")}</td>
+        <td>${outcomeSelect(r.connections).replace("data-outcome", "data-f=\"connections\"")}</td>
+        <td><select data-f="zs_live_dead">
+          <option value=""></option>
+          <option value="live"${r.zs_live_dead === "live" ? " selected" : ""}>live</option>
+          <option value="dead"${r.zs_live_dead === "dead" ? " selected" : ""}>dead</option>
+          <option value="NA"${r.zs_live_dead === "NA" ? " selected" : ""}>NA</option>
+        </select></td>
+        <td>${outcomeSelect(r.outcome).replace("data-outcome", "data-f=\"outcome\"")}</td>
+        <td><input data-f="rcd_id_label" value="${escapeHtml(c.rcd_id_label || "")}" /></td>
+        <td><button type="button" class="ghost" data-del-cct="${c.id}">Remove</button></td>
+      </tr>`;
+    }).join("") || `<tr><td colspan="14">No circuits</td></tr>`;
+  }
+
+  async function renderRcds() {
+    const ds = await rest("GET", "test_rcds", { query: `?board_id=eq.${state.testBoard.id}&select=*&order=rcd_id_label.asc` });
+    state.testRcds = ds;
+    const ids = ds.map((d) => d.id);
+    const results = ids.length
+      ? await rest("GET", "test_rcd_results", { query: `?rcd_id=in.(${ids.join(",")})&select=*` })
+      : [];
+    const by = Object.fromEntries(results.map((r) => [r.rcd_id, r]));
+    $("etrRcdBody").innerHTML = ds.map((d) => {
+      const r = by[d.id] || {};
+      const flag = r.t_1x_0_ms != null && Number(r.t_1x_0_ms) > Number((state.testDefaults || {}).rcd_1x_ms_flag || 300) && d.rcd_type !== "S" ? " flag" : "";
+      return `<tr data-rcd="${d.id}">
+        <td>${escapeHtml(d.rcd_id_label)}</td>
+        <td>${escapeHtml(d.cct_no || "")}</td>
+        <td>${escapeHtml(d.description || "")}</td>
+        <td>${escapeHtml(d.rcd_type === "unset" ? "" : d.rcd_type)}</td>
+        <td>${d.poles ?? ""}</td>
+        <td>${d.in_a ?? ""}</td>
+        <td>${d.idn_ma ?? ""}</td>
+        <td>${outcomeSelect(r.t_button).replace("data-outcome", "data-f=\"t_button\"")}</td>
+        <td>${outcomeSelect(r.half_rated_no_trip).replace("data-outcome", "data-f=\"half_rated_no_trip\"")}</td>
+        <td><input data-f="t_1x_0_ms" class="${flag.trim()}" inputmode="numeric" value="${r.t_1x_0_ms ?? ""}" /></td>
+        <td><input data-f="t_1x_180_ms" inputmode="numeric" value="${r.t_1x_180_ms ?? ""}" /></td>
+        <td><input data-f="t_5x_0_ms" inputmode="numeric" value="${r.t_5x_0_ms ?? ""}" /></td>
+        <td><input data-f="t_5x_180_ms" inputmode="numeric" value="${r.t_5x_180_ms ?? ""}" /></td>
+        <td>${outcomeSelect(r.poles_open).replace("data-outcome", "data-f=\"poles_open\"")}</td>
+        <td>${outcomeSelect(r.outcome).replace("data-outcome", "data-f=\"outcome\"")}</td>
+        <td><button type="button" class="ghost" data-del-rcd="${d.id}">Remove</button></td>
+      </tr>`;
+    }).join("") || `<tr><td colspan="16">No RCDs</td></tr>`;
+  }
+
+  async function renderDefects() {
+    const rows = await rest("GET", "test_defects", { query: `?session_id=eq.${state.testSession.id}&select=*&order=created_at.asc` });
+    $("etrDefectList").innerHTML = rows.map((d) => `<li>${escapeHtml(d.description)}</li>`).join("") || "<li>None</li>";
+  }
+
+  async function renderEcert() {
+    const rows = await rest("GET", "test_ecert_hooks", { query: `?session_id=eq.${state.testSession.id}&select=*` });
+    const h = rows[0];
+    $("etrEcertStatus").value = h?.status || "not_ready";
+    $("etrCcewRef").value = h?.ccew_ref || "";
+  }
+
+  async function saveHeader() {
+    await rest("PATCH", "test_sessions", {
+      query: `?id=eq.${state.testSession.id}`,
+      body: {
+        supply: $("etrSupply").value,
+        work_type: $("etrWork").value || null,
+        nmi: $("etrNmi").value.trim() || null,
+      },
+    });
+    await rest("PATCH", "test_boards", {
+      query: `?id=eq.${state.testBoard.id}`,
+      body: { name: $("etrBoardName").value.trim() || "MSB", location: $("etrBoardLoc").value.trim() || null },
+    });
+    if ($("etrNmi").value.trim()) {
+      await rest("PATCH", "jobs", { query: `?id=eq.${state.currentJob.id}`, body: { nmi: $("etrNmi").value.trim() } });
+      state.currentJob.nmi = $("etrNmi").value.trim();
+    }
+    if ($("etrLicence").value.trim() !== (state.profile.electrical_licence_number || "")) {
+      await rest("PATCH", "profiles", {
+        query: `?id=eq.${state.profile.id}`,
+        body: { electrical_licence_number: $("etrLicence").value.trim() || null },
+      });
+      state.profile.electrical_licence_number = $("etrLicence").value.trim();
+    }
+  }
+
+  async function saveBoardRow(tr) {
+    const key = tr.dataset.bkey;
+    const id = tr.dataset.rid;
+    const numEl = tr.querySelector("[data-num]");
+    const out = tr.querySelector("[data-outcome]").value || null;
+    const notes = tr.querySelector("[data-notes]").value || null;
+    const value_num = numEl && numEl.value !== "" ? Number(numEl.value) : null;
+    const body = { outcome: out, notes, value_num, board_id: state.testBoard.id, key, sort_order: BOARD_KEYS.findIndex((k) => k.key === key) };
+    if (id) await rest("PATCH", "test_board_rows", { query: `?id=eq.${id}`, body: { outcome: out, notes, value_num } });
+    else {
+      const created = await rest("POST", "test_board_rows", { body });
+      tr.dataset.rid = created[0].id;
+    }
+  }
+
+  async function upsertCircuitResult(cid, patch, extra) {
+    const existing = await rest("GET", "test_circuit_results", { query: `?circuit_id=eq.${cid}&select=circuit_id` });
+    if (existing.length) await rest("PATCH", "test_circuit_results", { query: `?circuit_id=eq.${cid}`, body: patch });
+    else await rest("POST", "test_circuit_results", { body: { circuit_id: cid, ...patch } });
+    if (extra && extra.rcd_id_label != null) {
+      await rest("PATCH", "test_circuits", { query: `?id=eq.${cid}`, body: { rcd_id_label: extra.rcd_id_label || null } });
+    }
+  }
+
+  async function upsertRcdResult(id, patch) {
+    const existing = await rest("GET", "test_rcd_results", { query: `?rcd_id=eq.${id}&select=rcd_id` });
+    if (existing.length) await rest("PATCH", "test_rcd_results", { query: `?rcd_id=eq.${id}`, body: patch });
+    else await rest("POST", "test_rcd_results", { body: { rcd_id: id, ...patch } });
+  }
+
+  function currentCable() {
+    if ($("etrCableType").value === "other" || $("etrCableSize").value === "other") {
+      return $("etrCableOther").value.trim();
+    }
+    return cableString($("etrCableType").value, $("etrCableCores").value, $("etrCableSize").value);
+  }
+
+  function currentDevice() {
+    return $("etrDevice").value === "other" ? $("etrDeviceOther").value.trim() : $("etrDevice").value;
+  }
+
+  async function addCircuit(fromLast) {
+    err("");
+    let cct_no = $("etrCctNo").value.trim();
+    let description = $("etrCctDesc").value.trim();
+    let phase = $("etrCctPhase").value;
+    let cable = currentCable();
+    let device = currentDevice();
+    if (fromLast) {
+      const last = state.testCircuits[state.testCircuits.length - 1];
+      if (!last) { err("No circuit to copy"); return; }
+      cct_no = cct_no || last.cct_no;
+      description = description || last.description;
+      phase = phase === "unset" ? last.phase : phase;
+      cable = cable || last.cable_a_n_e;
+      device = device || last.device;
+    }
+    if (!cct_no || !description) { err("CCT and description required"); return; }
+    const created = await rest("POST", "test_circuits", {
+      body: {
+        board_id: state.testBoard.id,
+        sort_order: state.testCircuits.length,
+        cct_no,
+        description,
+        phase,
+        cable_a_n_e: cable || null,
+        device: device || null,
+        source: "manual",
+      },
+    });
+    await rest("POST", "test_circuit_results", { body: { circuit_id: created[0].id } });
+    if ((device || "").startsWith("RCBO")) {
+      await rest("POST", "test_rcds", {
+        body: {
+          board_id: state.testBoard.id,
+          circuit_id: created[0].id,
+          rcd_id_label: `RCBO-${cct_no}`,
+          cct_no,
+          description,
+          idn_ma: 30,
+        },
+      });
+      await rest("PATCH", "test_circuits", { query: `?id=eq.${created[0].id}`, body: { rcd_id_label: `RCBO-${cct_no}` } });
+    }
+    $("etrCctNo").value = "";
+    $("etrCctDesc").value = "";
+    await renderCircuits();
+    await renderRcds();
+  }
+
+  function headHtml(sheet, page, pages) {
+    const job = state.currentJob;
+    const s = state.testSession;
+    const b = state.testBoard;
+    const m1 = (state.testSnaps || []).find((x) => x.role === "meter_1");
+    const m2 = (state.testSnaps || []).find((x) => x.role === "meter_2");
+    const meter = (m) => m ? `${m.make_model} ${m.serial} cal ${m.cal_due}` : "";
+    const work = ({ new: "New", add: "Add", alt: "Alt", repair: "Repair" })[s.work_type] || "";
+    const supply = s.supply === "unset" ? "" : s.supply;
+    const date = (s.completed_at || s.started_at || "").replace("T", " ").slice(0, 16);
+    return `<div class="etr-sheet">
+      <div style="display:flex;justify-content:space-between;align-items:baseline">
+        <strong>INLAND ENERGY SERVICES</strong>
+        <h1>ELECTRICAL TEST RECORD</h1>
+        <span>${page} of ${pages} ${sheet} IES-ETR-001 Rev A</span>
+      </div>
+      <div class="etr-head">
+        <div><label>JOB</label><strong>${escapeHtml(job.number)}</strong></div>
+        <div><label>W/O</label><strong></strong></div>
+        <div><label>CLIENT</label><strong>${escapeHtml(job.customers?.name || "")}</strong></div>
+        <div><label>DATE</label><strong>${escapeHtml(date)}</strong></div>
+        <div><label>SITE</label><strong>${escapeHtml(job.sites?.address || job.sites?.label || "")}</strong></div>
+        <div><label>NMI</label><strong>${escapeHtml(s.nmi || "")}</strong></div>
+        <div><label>SUPPLY</label><strong>${escapeHtml(supply)} · 1ph / 3ph</strong></div>
+        <div><label>PAGES</label><strong>${page} / ${pages}</strong></div>
+        <div><label>BOARD</label><strong>${escapeHtml(b.name || "")}</strong></div>
+        <div><label>BOARD LOC.</label><strong>${escapeHtml(b.location || "")}</strong></div>
+        <div><label>WORK</label><strong>${escapeHtml(work)} · New / Add / Alt / Repair</strong></div>
+        <div><label>LICENCE</label><strong>${escapeHtml(s.tester_licence_no || state.profile.electrical_licence_number || "")}</strong></div>
+        <div><label>TESTED BY</label><strong>${escapeHtml(s.tester_name || state.profile.display_name || "")}</strong></div>
+        <div><label>SIGN</label><strong>${escapeHtml(s.status === "complete" ? (s.tester_name || "") : "")}</strong></div>
+        <div><label>TIME</label><strong>${escapeHtml(date.slice(11))}</strong></div>
+        <div><label>METER 1</label><strong>${escapeHtml(meter(m1))}</strong></div>
+        <div><label>METER 2</label><strong>${escapeHtml(meter(m2))}</strong></div>
+      </div>`;
+  }
+
+  async function buildPaper() {
+    await loadSnaps();
+    const boardRows = await rest("GET", "test_board_rows", { query: `?board_id=eq.${state.testBoard.id}&select=*&order=sort_order.asc` });
+    const by = Object.fromEntries(boardRows.map((r) => [r.key, r]));
+    const circuits = await rest("GET", "test_circuits", { query: `?board_id=eq.${state.testBoard.id}&select=*&order=sort_order.asc` });
+    const cids = circuits.map((c) => c.id);
+    const cress = cids.length ? await rest("GET", "test_circuit_results", { query: `?circuit_id=in.(${cids.join(",")})&select=*` }) : [];
+    const crBy = Object.fromEntries(cress.map((r) => [r.circuit_id, r]));
+    const rcds = await rest("GET", "test_rcds", { query: `?board_id=eq.${state.testBoard.id}&select=*` });
+    const rids = rcds.map((d) => d.id);
+    const rress = rids.length ? await rest("GET", "test_rcd_results", { query: `?rcd_id=in.(${rids.join(",")})&select=*` }) : [];
+    const rrBy = Object.fromEntries(rress.map((r) => [r.rcd_id, r]));
+    const defects = await rest("GET", "test_defects", { query: `?session_id=eq.${state.testSession.id}&select=*` });
+    const defText = defects.map((d) => d.description).join("; ");
+
+    const cPages = Math.max(1, Math.ceil(Math.max(circuits.length, 1) / 18));
+    const rPages = Math.max(1, Math.ceil(Math.max(rcds.length, 1) / 16));
+    const pages = 1 + cPages + rPages;
+
+    let html = headHtml("BOARD", 1, pages);
+    html += `<table><thead><tr><th>TEST</th><th>RESULT</th><th>P / F / NA</th><th>NOTES</th></tr></thead><tbody>`;
+    BOARD_KEYS.forEach((k) => {
+      const r = by[k.key] || {};
+      html += `<tr><td>${escapeHtml(k.label)}</td><td>${escapeHtml(r.value_num != null ? String(r.value_num) : (r.value_text || ""))}</td><td>${escapeHtml(r.outcome || "")}</td><td>${escapeHtml(r.notes || "")}</td></tr>`;
+    });
+    html += `</tbody></table><p><strong>DEFECTS / LIMITATIONS / RETEST</strong> ${escapeHtml(defText || "Blank = none.")}</p>
+      <p class="etr-foot">IES-ETR-001 Rev A | BOARD | Not a CCEW | BCNSW eCert within 7 days</p></div>`;
+
+    for (let p = 0; p < cPages; p += 1) {
+      const slice = circuits.slice(p * 18, p * 18 + 18);
+      while (slice.length < 18) slice.push(null);
+      html += headHtml("CIRCUITS", 2 + p, pages);
+      html += `<table><thead><tr><th>CCT</th><th>DESCRIPTION</th><th>PH</th><th>CABLE A / N / E mm²</th><th>DEVICE</th><th>EARTH Ω</th><th>IR MΩ</th><th>Zs Ω</th><th>POL</th><th>CONN</th><th>LIVE Zs?</th><th>P/F NA</th><th>RCD ID</th><th>NOTES / RETEST</th></tr></thead><tbody>`;
+      slice.forEach((c) => {
+        const r = c ? crBy[c.id] || {} : {};
+        html += `<tr>
+          <td>${escapeHtml(c?.cct_no || "")}</td><td>${escapeHtml(c?.description || "")}</td>
+          <td>${escapeHtml(c && c.phase !== "unset" ? c.phase : "")}</td>
+          <td>${escapeHtml(c?.cable_a_n_e || "")}</td><td>${escapeHtml(c?.device || "")}</td>
+          <td>${r.earth_ohm ?? ""}</td><td>${r.ir_mohm ?? ""}</td><td>${r.zs_ohm ?? ""}</td>
+          <td>${escapeHtml(r.polarity || "")}</td><td>${escapeHtml(r.connections || "")}</td>
+          <td>${escapeHtml(r.zs_live_dead || "")}</td><td>${escapeHtml(r.outcome || "")}</td>
+          <td>${escapeHtml(c?.rcd_id_label || "")}</td><td>${escapeHtml(r.notes || "")}</td>
+        </tr>`;
+      });
+      html += `</tbody></table><p><strong>DEFECTS / RETEST</strong> ${escapeHtml(defText)}</p>
+        <p class="etr-foot">IES-ETR-001 Rev A | CIRCUITS | Not a CCEW | BCNSW eCert within 7 days</p></div>`;
+    }
+
+    for (let p = 0; p < rPages; p += 1) {
+      const slice = rcds.slice(p * 16, p * 16 + 16);
+      while (slice.length < 16) slice.push(null);
+      html += headHtml("RCD", 1 + cPages + 1 + p, pages);
+      html += `<table><thead><tr><th>RCD ID</th><th>CCT</th><th>DESCRIPTION / CIRCUITS PROTECTED</th><th>TYPE AC A F B S</th><th>POLES</th><th>In A</th><th>IΔn mA</th><th>T-BTN</th><th>0.5× NO TRIP</th><th>1× 0° ms</th><th>1× 180° ms</th><th>5× 0° ms</th><th>5× 180° ms</th><th>POLES OPEN</th><th>P/F NA</th><th>NOTES / RETEST</th></tr></thead><tbody>`;
+      slice.forEach((d) => {
+        const r = d ? rrBy[d.id] || {} : {};
+        html += `<tr>
+          <td>${escapeHtml(d?.rcd_id_label || "")}</td><td>${escapeHtml(d?.cct_no || "")}</td>
+          <td>${escapeHtml(d?.description || "")}</td><td>${escapeHtml(d && d.rcd_type !== "unset" ? d.rcd_type : "")}</td>
+          <td>${d?.poles ?? ""}</td><td>${d?.in_a ?? ""}</td><td>${d?.idn_ma ?? ""}</td>
+          <td>${escapeHtml(r.t_button || "")}</td><td>${escapeHtml(r.half_rated_no_trip || "")}</td>
+          <td>${r.t_1x_0_ms ?? ""}</td><td>${r.t_1x_180_ms ?? ""}</td>
+          <td>${r.t_5x_0_ms ?? ""}</td><td>${r.t_5x_180_ms ?? ""}</td>
+          <td>${escapeHtml(r.poles_open || "")}</td><td>${escapeHtml(r.outcome || "")}</td>
+          <td>${escapeHtml(r.notes || "")}</td>
+        </tr>`;
+      });
+      html += `</tbody></table><p><strong>DEFECTS / RETEST</strong> ${escapeHtml(defText)}</p>
+        <p class="etr-foot">IES-ETR-001 Rev A | RCD | Times in ms | Not a CCEW | BCNSW eCert within 7 days</p></div>`;
+    }
+    $("etrPaper").innerHTML = html;
+  }
+
+  function printPaper() {
+    document.body.classList.add("etr-print");
+    $("etrPaper").hidden = false;
+    window.print();
+    setTimeout(() => {
+      document.body.classList.remove("etr-print");
+      $("etrPaper").hidden = true;
+    }, 500);
+  }
+
+  $("newTestRecord")?.addEventListener("click", async () => {
+    try { await createSession("in_progress"); } catch (e) { if ($("testListError")) { $("testListError").textContent = e.message; $("testListError").hidden = false; } }
+  });
+  $("setupTestRecord")?.addEventListener("click", async () => {
+    try { await createSession("setup"); } catch (e) { if ($("testListError")) { $("testListError").textContent = e.message; $("testListError").hidden = false; } }
+  });
+  $("testSessionBody")?.addEventListener("click", async (e) => {
+    const tr = e.target.closest("tr[data-etr]");
+    if (!tr) return;
+    try { await openSession(tr.dataset.etr); } catch (err2) { err(err2.message); }
+  });
+  $("testBack")?.addEventListener("click", async () => {
+    if (state.currentJob) await openJob(state.currentJob.id, "pack");
+  });
+  $("testPaneChips")?.addEventListener("click", (e) => {
+    const btn = e.target.closest("[data-etr-pane]");
+    if (!btn) return;
+    document.querySelectorAll("#testPaneChips button").forEach((b) => b.classList.toggle("on", b === btn));
+    document.querySelectorAll("[data-etr-page]").forEach((p) => { p.hidden = p.dataset.etrPage !== btn.dataset.etrPane; });
+  });
+  ["etrBoardName", "etrBoardLoc", "etrSupply", "etrWork", "etrNmi", "etrLicence"].forEach((id) => {
+    $(id)?.addEventListener("change", () => saveHeader().catch((e) => err(e.message)));
+  });
+  $("etrMeter1")?.addEventListener("change", () => setMeter("meter_1", $("etrMeter1").value).catch((e) => err(e.message)));
+  $("etrMeter2")?.addEventListener("change", () => setMeter("meter_2", $("etrMeter2").value).catch((e) => err(e.message)));
+  $("etrAddMeter")?.addEventListener("click", () => { $("etrMeterAdd").hidden = !$("etrMeterAdd").hidden; });
+  $("etrMeterSave")?.addEventListener("click", async () => {
+    try {
+      await rest("POST", "test_instruments", { body: {
+        make_model: $("etrMeterMake").value.trim(),
+        serial: $("etrMeterSerial").value.trim(),
+        function: $("etrMeterFn").value.trim() || null,
+        cal_due: $("etrMeterCal").value,
+      }});
+      state.testInstruments = await rest("GET", "test_instruments", { query: `?active=eq.true&select=*&order=make_model.asc` });
+      renderMeters();
+      $("etrMeterAdd").hidden = true;
+    } catch (e) { err(e.message); }
+  });
+  $("etrCableType")?.addEventListener("change", () => {
+    const other = $("etrCableType").value === "other" || $("etrCableSize").value === "other";
+    $("etrCableOther").hidden = !other;
+    if ($("etrCableType").value === "SDI") $("etrCableCores").value = "SDI set";
+  });
+  $("etrCableSize")?.addEventListener("change", () => {
+    $("etrCableOther").hidden = $("etrCableSize").value !== "other" && $("etrCableType").value !== "other";
+  });
+  $("etrDevice")?.addEventListener("change", () => { $("etrDeviceOther").hidden = $("etrDevice").value !== "other"; });
+  $("etrAddCircuit")?.addEventListener("click", () => addCircuit(false).catch((e) => err(e.message)));
+  $("etrCopyCircuit")?.addEventListener("click", () => addCircuit(true).catch((e) => err(e.message)));
+  $("etrAddRcd")?.addEventListener("click", async () => {
+    try {
+      if (!$("etrRcdId").value.trim() || !$("etrRcdDesc").value.trim()) { err("RCD ID and description required"); return; }
+      const created = await rest("POST", "test_rcds", { body: {
+        board_id: state.testBoard.id,
+        rcd_id_label: $("etrRcdId").value.trim(),
+        cct_no: $("etrRcdCct").value.trim() || null,
+        description: $("etrRcdDesc").value.trim(),
+        rcd_type: $("etrRcdType").value,
+        poles: $("etrRcdPoles").value ? Number($("etrRcdPoles").value) : null,
+        in_a: $("etrRcdIn").value ? Number($("etrRcdIn").value) : null,
+        idn_ma: $("etrRcdIdn").value ? Number($("etrRcdIdn").value) : 30,
+      }});
+      await rest("POST", "test_rcd_results", { body: { rcd_id: created[0].id } });
+      $("etrRcdId").value = ""; $("etrRcdDesc").value = "";
+      await renderRcds();
+    } catch (e) { err(e.message); }
+  });
+  $("etrBoardBody")?.addEventListener("change", (e) => {
+    const tr = e.target.closest("tr[data-bkey]");
+    if (tr) saveBoardRow(tr).catch((x) => err(x.message));
+  });
+  $("etrCircuitBody")?.addEventListener("change", (e) => {
+    const tr = e.target.closest("tr[data-cct]");
+    if (!tr) return;
+    const f = e.target.dataset.f;
+    if (!f) return;
+    const val = e.target.value === "" ? null : (["earth_ohm", "ir_mohm", "zs_ohm"].includes(f) ? Number(e.target.value) : e.target.value);
+    const extra = f === "rcd_id_label" ? { rcd_id_label: e.target.value } : null;
+    const patch = f === "rcd_id_label" ? {} : { [f]: val };
+    upsertCircuitResult(tr.dataset.cct, patch, extra).catch((x) => err(x.message));
+  });
+  $("etrCircuitBody")?.addEventListener("click", async (e) => {
+    const id = e.target.dataset.delCct;
+    if (!id) return;
+    try { await rest("DELETE", "test_circuits", { query: `?id=eq.${id}` }); await renderCircuits(); } catch (x) { err(x.message); }
+  });
+  $("etrRcdBody")?.addEventListener("change", (e) => {
+    const tr = e.target.closest("tr[data-rcd]");
+    if (!tr || !e.target.dataset.f) return;
+    const f = e.target.dataset.f;
+    const num = ["t_1x_0_ms", "t_1x_180_ms", "t_5x_0_ms", "t_5x_180_ms"].includes(f);
+    const val = e.target.value === "" ? null : (num ? Number(e.target.value) : e.target.value);
+    upsertRcdResult(tr.dataset.rcd, { [f]: val }).catch((x) => err(x.message));
+  });
+  $("etrRcdBody")?.addEventListener("click", async (e) => {
+    const id = e.target.dataset.delRcd;
+    if (!id) return;
+    try { await rest("DELETE", "test_rcds", { query: `?id=eq.${id}` }); await renderRcds(); } catch (x) { err(x.message); }
+  });
+  $("etrDefectForm")?.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    try {
+      await rest("POST", "test_defects", { body: {
+        session_id: state.testSession.id,
+        kind: "circuit",
+        target_id: state.testBoard.id,
+        description: $("etrDefectText").value.trim(),
+      }});
+      $("etrDefectText").value = "";
+      await renderDefects();
+    } catch (x) { err(x.message); }
+  });
+  $("etrSaveEcert")?.addEventListener("click", async () => {
+    try {
+      const existing = await rest("GET", "test_ecert_hooks", { query: `?session_id=eq.${state.testSession.id}&select=session_id` });
+      const body = { status: $("etrEcertStatus").value, ccew_ref: $("etrCcewRef").value.trim() || null };
+      if (existing.length) await rest("PATCH", "test_ecert_hooks", { query: `?session_id=eq.${state.testSession.id}`, body });
+      else await rest("POST", "test_ecert_hooks", { body: { session_id: state.testSession.id, ...body } });
+    } catch (x) { err(x.message); }
+  });
+  $("etrComplete")?.addEventListener("click", async () => {
+    try {
+      await saveHeader();
+      const row = await rpc("complete_test_session", { p_session: state.testSession.id });
+      state.testSession = Array.isArray(row) ? row[0] : row;
+      await buildPaper();
+      printPaper();
+      err("");
+      await openSession(state.testSession.id);
+    } catch (x) { err(x.message); }
+  });
+  $("etrExportPdf")?.addEventListener("click", async () => {
+    try { await buildPaper(); printPaper(); } catch (x) { err(x.message); }
+  });
+  $("etrVoid")?.addEventListener("click", async () => {
+    if (!isOffice()) return;
+    try {
+      await rest("PATCH", "test_sessions", { query: `?id=eq.${state.testSession.id}`, body: { status: "void" } });
+      await openJob(state.currentJob.id, "pack");
+    } catch (x) { err(x.message); }
+  });
+
+  const origPack = api.loadPack;
+  api.loadPack = async function loadPackWithTests() {
+    const r = await origPack();
+    await listSessions();
+    return r;
+  };
+}
+
+if (window.JOBS_API) window.JobsTestRecord(window.JOBS_API);
 
 </script>
 </body>
